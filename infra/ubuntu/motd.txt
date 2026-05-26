@@ -1,0 +1,22 @@
+╔══════════════════════════════════════════════════════════════════╗
+║                Tertiary Training — Ubuntu Lab                    ║
+╚══════════════════════════════════════════════════════════════════╝
+
+  Pre-installed:
+    - Ubuntu 24.04
+    - Node.js 24 (use:   node --version)
+    - npm / yarn / pnpm
+    - Python 3 + pip + venv
+    - git, curl, wget, build-essential, jq, vim, nano, tmux
+    - Passwordless sudo (you are 'trainer')
+
+  Examples:
+    sudo apt-get update && sudo apt-get install -y <pkg>
+    git clone https://github.com/...
+    node --version && npm --version
+
+  Heads up:
+    - Everything you do here is wiped on Refresh — your trainer
+      can reset this container at any time.
+    - This terminal is read-write; just start typing.
+

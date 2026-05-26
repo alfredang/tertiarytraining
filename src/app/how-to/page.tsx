@@ -21,6 +21,13 @@ const guides = [
     icon: "⌬",
   },
   {
+    href: "/how-to/ubuntu-environment",
+    title: "Ubuntu Environment",
+    description:
+      "5 Ubuntu 24.04 lab containers with Node 24 + dev tools, accessed via a browser terminal. Install OpenClaw, Hermes, anything else.",
+    icon: "▣",
+  },
+  {
     href: "/how-to/enable-real-docker",
     title: "Enable Real Docker Control",
     description:

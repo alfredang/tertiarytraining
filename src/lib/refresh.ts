@@ -31,10 +31,17 @@ export async function refreshOneContainer(containerId: string, actorId: string) 
       containerUrl = result.containerUrl;
     } else {
       await svc.stopAndRemove(container.name);
+      // Ubuntu/ttyd containers need the PORT env var so ttyd inside the
+      // container listens on the same port that's bound to the host.
+      const env: string[] = [];
+      if (container.environment.name === "Ubuntu") {
+        env.push(`PORT=${container.port}`);
+      }
       const result = await svc.run(
         container.environment.dockerImage,
         container.name,
         container.port,
+        env.length ? env : undefined,
       );
       containerUrl = result.containerUrl;
     }

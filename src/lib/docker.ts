@@ -27,7 +27,7 @@ export type WpContainerInfo = {
 
 export interface DockerService {
   stopAndRemove(name: string): Promise<void>;
-  run(image: string, name: string, port: number): Promise<RunResult>;
+  run(image: string, name: string, port: number, env?: string[]): Promise<RunResult>;
   /** Optional — present in dockerode mode only. Restores the WP DB from a golden snapshot. */
   softResetWp?(info: WpContainerInfo): Promise<RunResult>;
 }
@@ -39,8 +39,8 @@ class MockDockerService implements DockerService {
   async stopAndRemove(name: string): Promise<void> {
     console.log(`[docker:mock] stop+remove ${name}`);
   }
-  async run(image: string, name: string, port: number): Promise<RunResult> {
-    console.log(`[docker:mock] run ${image} as ${name} on :${port}`);
+  async run(image: string, name: string, port: number, env?: string[]): Promise<RunResult> {
+    console.log(`[docker:mock] run ${image} as ${name} on :${port}${env?.length ? ` env=${env.join(",")}` : ""}`);
     const base = process.env.PUBLIC_BASE_URL ?? "http://localhost";
     const token = Math.random().toString(36).slice(2, 8);
     return { containerUrl: `${base.replace(/\/$/, "")}:${port}/?s=${token}` };
@@ -67,18 +67,24 @@ class DockerodeService implements DockerService {
     }
   }
 
-  async run(image: string, name: string, port: number): Promise<RunResult> {
-    // Pull image (no-op if cached)
-    await new Promise<void>((resolve, reject) => {
-      this.docker.pull(image, (err: Error | null, stream: NodeJS.ReadableStream) => {
-        if (err) return reject(err);
-        this.docker.modem.followProgress(stream, (e: Error | null) => (e ? reject(e) : resolve()));
+  async run(image: string, name: string, port: number, env?: string[]): Promise<RunResult> {
+    // Pull only if the image isn't already present locally (custom-built
+    // images like tertiary-ubuntu:latest wouldn't be on the registry).
+    try {
+      await this.docker.getImage(image).inspect();
+    } catch {
+      await new Promise<void>((resolve, reject) => {
+        this.docker.pull(image, (err: Error | null, stream: NodeJS.ReadableStream) => {
+          if (err) return reject(err);
+          this.docker.modem.followProgress(stream, (e: Error | null) => (e ? reject(e) : resolve()));
+        });
       });
-    });
+    }
 
     const container = await this.docker.createContainer({
       Image: image,
       name,
+      Env: env,
       ExposedPorts: { [`${port}/tcp`]: {} },
       HostConfig: {
         PortBindings: { [`${port}/tcp`]: [{ HostPort: String(port) }] },
@@ -87,8 +93,10 @@ class DockerodeService implements DockerService {
     });
     await container.start();
 
-    const base = process.env.PUBLIC_BASE_URL ?? "http://localhost";
-    return { containerUrl: `${base.replace(/\/$/, "")}:${port}` };
+    // For containers whose internal port matches the host port (the
+    // pattern this app uses), just point the URL at host:port.
+    const host = process.env.PUBLIC_HOST_IP ?? process.env.PUBLIC_BASE_URL?.replace(/^https?:\/\//, "").replace(/\/.*$/, "") ?? "localhost";
+    return { containerUrl: `http://${host}:${port}/` };
   }
 
   /**
