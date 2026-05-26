@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { dockerService } from "./docker";
+import { dockerService, wpSoftResetTarget } from "./docker";
 import type { RefreshScope } from "@prisma/client";
 
 export async function refreshOneContainer(containerId: string, actorId: string) {
@@ -16,12 +16,29 @@ export async function refreshOneContainer(containerId: string, actorId: string) 
 
   const svc = dockerService();
   try {
-    await svc.stopAndRemove(container.name);
-    const { containerUrl } = await svc.run(
-      container.environment.dockerImage,
-      container.name,
-      container.port,
-    );
+    // WordPress containers get a soft-reset: DB restored from golden snapshot,
+    // container keeps running, credentials preserved.
+    const wpTarget = wpSoftResetTarget({
+      environmentName: container.environment.name,
+      port: container.port,
+      containerUrl: container.containerUrl,
+      displayName: container.name,
+    });
+
+    let containerUrl: string;
+    if (wpTarget && svc.softResetWp) {
+      const result = await svc.softResetWp(wpTarget);
+      containerUrl = result.containerUrl;
+    } else {
+      await svc.stopAndRemove(container.name);
+      const result = await svc.run(
+        container.environment.dockerImage,
+        container.name,
+        container.port,
+      );
+      containerUrl = result.containerUrl;
+    }
+
     await prisma.dockerContainer.update({
       where: { id: containerId },
       data: {

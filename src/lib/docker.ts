@@ -1,19 +1,40 @@
 /**
  * DockerService — abstracts container lifecycle.
  *
- * Modes:
- *   - "mock":     no daemon needed; just simulates stop/run and returns a generated URL.
- *   - "dockerode": real integration via the `dockerode` npm package and /var/run/docker.sock.
- *                  (Not bundled by default — install dockerode and uncomment the impl below.)
+ * Modes (set via DOCKER_HOST_MODE env var):
+ *   - "mock"      (default): no daemon needed; simulates lifecycle, returns mock URLs.
+ *   - "dockerode" (real)   : controls the host Docker daemon via /var/run/docker.sock.
+ *                             Requires the socket to be bind-mounted into the app
+ *                             container, and the `app` user to be in the docker group.
  */
 
+import Docker from "dockerode";
+
 export type RunResult = { containerUrl: string };
+
+export type WpContainerInfo = {
+  /** Display name in our DB, e.g. "WP Demo 1" */
+  displayName: string;
+  /** Docker container hosting WordPress, e.g. "wordpress-demo1-wordpress-1" */
+  wpContainer: string;
+  /** Docker container hosting MariaDB, e.g. "wordpress-demo1-db-1" */
+  dbContainer: string;
+  /** Path inside the app container to the golden SQL snapshot (bind-mounted from host) */
+  goldenSqlPath: string;
+  /** Public access URL (we return this unchanged after a soft reset) */
+  containerUrl: string;
+};
 
 export interface DockerService {
   stopAndRemove(name: string): Promise<void>;
   run(image: string, name: string, port: number): Promise<RunResult>;
+  /** Optional — present in dockerode mode only. Restores the WP DB from a golden snapshot. */
+  softResetWp?(info: WpContainerInfo): Promise<RunResult>;
 }
 
+// ============================================================================
+// Mock — default. Simulates lifecycle, doesn't touch real containers.
+// ============================================================================
 class MockDockerService implements DockerService {
   async stopAndRemove(name: string): Promise<void> {
     console.log(`[docker:mock] stop+remove ${name}`);
@@ -24,44 +45,150 @@ class MockDockerService implements DockerService {
     const token = Math.random().toString(36).slice(2, 8);
     return { containerUrl: `${base.replace(/\/$/, "")}:${port}/?s=${token}` };
   }
+  async softResetWp(info: WpContainerInfo): Promise<RunResult> {
+    console.log(`[docker:mock] soft-reset ${info.wpContainer} from ${info.goldenSqlPath}`);
+    return { containerUrl: info.containerUrl };
+  }
 }
 
-// To enable real Docker control:
-//   1) npm i dockerode @types/dockerode
-//   2) Mount /var/run/docker.sock into the Coolify app container
-//   3) Set DOCKER_HOST_MODE=dockerode
-//   4) Uncomment the implementation below.
-//
-// import Docker from "dockerode";
-// class DockerodeService implements DockerService {
-//   private docker = new Docker({ socketPath: "/var/run/docker.sock" });
-//   async stopAndRemove(name: string) {
-//     try {
-//       const c = this.docker.getContainer(name);
-//       await c.stop().catch(() => {});
-//       await c.remove({ force: true }).catch(() => {});
-//     } catch {}
-//   }
-//   async run(image: string, name: string, port: number): Promise<RunResult> {
-//     await this.docker.pull(image);
-//     const c = await this.docker.createContainer({
-//       Image: image,
-//       name,
-//       HostConfig: { PortBindings: { [`${port}/tcp`]: [{ HostPort: String(port) }] } },
-//       ExposedPorts: { [`${port}/tcp`]: {} },
-//     });
-//     await c.start();
-//     const base = process.env.PUBLIC_BASE_URL ?? "http://localhost";
-//     return { containerUrl: `${base.replace(/\/$/, "")}:${port}` };
-//   }
-// }
+// ============================================================================
+// Dockerode — real Docker control via /var/run/docker.sock.
+// ============================================================================
+class DockerodeService implements DockerService {
+  private docker = new Docker({ socketPath: "/var/run/docker.sock" });
 
+  async stopAndRemove(name: string): Promise<void> {
+    try {
+      const c = this.docker.getContainer(name);
+      await c.stop({ t: 10 }).catch(() => {});
+      await c.remove({ force: true }).catch(() => {});
+    } catch (err) {
+      console.warn(`[docker:dockerode] stopAndRemove ${name} failed`, err);
+    }
+  }
+
+  async run(image: string, name: string, port: number): Promise<RunResult> {
+    // Pull image (no-op if cached)
+    await new Promise<void>((resolve, reject) => {
+      this.docker.pull(image, (err: Error | null, stream: NodeJS.ReadableStream) => {
+        if (err) return reject(err);
+        this.docker.modem.followProgress(stream, (e: Error | null) => (e ? reject(e) : resolve()));
+      });
+    });
+
+    const container = await this.docker.createContainer({
+      Image: image,
+      name,
+      ExposedPorts: { [`${port}/tcp`]: {} },
+      HostConfig: {
+        PortBindings: { [`${port}/tcp`]: [{ HostPort: String(port) }] },
+        RestartPolicy: { Name: "unless-stopped" },
+      },
+    });
+    await container.start();
+
+    const base = process.env.PUBLIC_BASE_URL ?? "http://localhost";
+    return { containerUrl: `${base.replace(/\/$/, "")}:${port}` };
+  }
+
+  /**
+   * Soft-reset a WordPress demo: leaves the container running, wipes the DB,
+   * and restores from the golden SQL snapshot — preserving credentials and
+   * sample state without restarting the container.
+   */
+  async softResetWp(info: WpContainerInfo): Promise<RunResult> {
+    const dbContainer = this.docker.getContainer(info.dbContainer);
+
+    // Grab the MariaDB root password from the DB container's env
+    const inspect = await dbContainer.inspect();
+    const env = inspect.Config?.Env ?? [];
+    const rootPwLine = env.find((e: string) => e.startsWith("MYSQL_ROOT_PASSWORD="));
+    if (!rootPwLine) throw new Error(`MYSQL_ROOT_PASSWORD not set on ${info.dbContainer}`);
+    const rootPw = rootPwLine.split("=", 2)[1];
+
+    // The golden SQL file is bind-mounted into THIS app container at info.goldenSqlPath.
+    // We need it accessible inside the DB container. Two ways:
+    //   (a) Copy via docker.putArchive into a temp path in the DB container, then mysql < it
+    //   (b) Have the host bind-mount the same dir into the DB container — not the case here
+    // Path (a): read the SQL bytes from our filesystem, tar them up, putArchive into /tmp/restore.sql
+    const fs = await import("node:fs/promises");
+    const sql = await fs.readFile(info.goldenSqlPath);
+    const tar = await import("tar-stream");
+    const pack = tar.pack();
+    pack.entry({ name: "restore.sql" }, sql);
+    pack.finalize();
+    const chunks: Buffer[] = [];
+    for await (const chunk of pack as unknown as AsyncIterable<Buffer>) chunks.push(chunk);
+    const tarBuf = Buffer.concat(chunks);
+    await dbContainer.putArchive(tarBuf, { path: "/tmp" });
+
+    // Drop & recreate the wordpress DB, then restore from /tmp/restore.sql
+    const exec = await dbContainer.exec({
+      Cmd: [
+        "sh",
+        "-c",
+        `mariadb -u root -p"${rootPw}" -e "DROP DATABASE IF EXISTS wordpress; CREATE DATABASE wordpress;" && ` +
+          `mariadb -u root -p"${rootPw}" wordpress < /tmp/restore.sql && rm -f /tmp/restore.sql`,
+      ],
+      AttachStdout: true,
+      AttachStderr: true,
+    });
+    const stream = await exec.start({ hijack: true, stdin: false });
+    await new Promise<void>((resolve, reject) => {
+      stream.on("end", resolve);
+      stream.on("error", reject);
+      stream.resume();
+    });
+    const result = await exec.inspect();
+    if (result.ExitCode !== 0)
+      throw new Error(`mariadb restore exited ${result.ExitCode}`);
+
+    // WP container is unchanged, URL stays the same.
+    return { containerUrl: info.containerUrl };
+  }
+}
+
+// ============================================================================
 let _service: DockerService | null = null;
 export function dockerService(): DockerService {
   if (_service) return _service;
-  // const mode = process.env.DOCKER_HOST_MODE ?? "mock";
-  // if (mode === "dockerode") _service = new DockerodeService();
-  // else _service = new MockDockerService();
-  _service = new MockDockerService();
+  const mode = (process.env.DOCKER_HOST_MODE ?? "mock").toLowerCase();
+  if (mode === "dockerode") {
+    try {
+      _service = new DockerodeService();
+      console.log("[docker] using DockerodeService");
+    } catch (err) {
+      console.error("[docker] failed to init DockerodeService, falling back to mock", err);
+      _service = new MockDockerService();
+    }
+  } else {
+    _service = new MockDockerService();
+  }
   return _service;
+}
+
+/**
+ * Map an internal DockerContainer (DB row) to the actual host docker
+ * container names + golden snapshot path for soft-reset.
+ *
+ * Currently hard-coded to the Tertiary Training WordPress demo layout:
+ *   - environment.name === "WordPress"
+ *   - port range 8081..8085 → wordpress-demo{1..5}-{wordpress,db}-1
+ */
+export function wpSoftResetTarget(args: {
+  environmentName: string;
+  port: number;
+  containerUrl: string;
+  displayName: string;
+}): WpContainerInfo | null {
+  if (args.environmentName !== "WordPress") return null;
+  const n = args.port - 8080;
+  if (n < 1 || n > 5) return null;
+  return {
+    displayName: args.displayName,
+    wpContainer: `wordpress-demo${n}-wordpress-1`,
+    dbContainer: `wordpress-demo${n}-db-1`,
+    goldenSqlPath: `/opt/tertiarytraining/wp-golden/demo-${n}.sql`,
+    containerUrl: args.containerUrl,
+  };
 }

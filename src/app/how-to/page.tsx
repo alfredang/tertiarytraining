@@ -19,6 +19,13 @@ const guides = [
       "How to log into the WordPress backend admin and how to refresh containers when learners break them.",
     icon: "⌬",
   },
+  {
+    href: "/how-to/enable-real-docker",
+    title: "Enable Real Docker Control",
+    description:
+      "Switch from mock mode to dockerode so Refresh actually restores WordPress demos to a known good state with a one-shot bootstrap script.",
+    icon: "⬢",
+  },
 ];
 
 export default async function Page() {

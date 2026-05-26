@@ -191,14 +191,23 @@ export default async function Page() {
               </li>
             </ul>
 
-            <h3 className="font-medium text-zinc-100 mt-3">What happens under the hood</h3>
+            <h3 className="font-medium text-zinc-100 mt-3">What happens under the hood (real Docker mode)</h3>
             <ol className="list-decimal pl-5 space-y-1 text-zinc-400">
-              <li>The container is stopped</li>
-              <li>The container is removed (data wiped)</li>
-              <li>A fresh container is recreated from <code>wordpress:latest</code></li>
+              <li>The WP container <strong>keeps running</strong> — no restart, no downtime</li>
+              <li>The DB container&apos;s <code>wordpress</code> database is dropped</li>
+              <li>The golden SQL snapshot under <code>/opt/tertiarytraining/wp-golden/demo-N.sql</code> is restored into the DB</li>
+              <li>The shared <code>tertiarytraining</code> admin credentials and any baseline sample content are <strong>preserved</strong></li>
+              <li>Any learner-added posts, pages, plugins activations are <strong>gone</strong></li>
               <li>Status flips back to <code>RUNNING</code> and a row is added to <Link href="/admin/refresh-logs" className="text-indigo-400 hover:underline">Refresh Logs</Link></li>
-              <li>The next visit triggers the WordPress install wizard again</li>
+              <li>Total time: ~1-2 seconds per container</li>
             </ol>
+            <p className="text-xs text-zinc-500">
+              See{" "}
+              <Link href="/how-to/enable-real-docker" className="text-indigo-400 hover:underline">
+                Enable Real Docker Control
+              </Link>{" "}
+              for the one-time setup to capture each demo&apos;s golden snapshot.
+            </p>
 
             <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200/90">
               🛑 <strong>Learners cannot refresh containers.</strong> The refresh

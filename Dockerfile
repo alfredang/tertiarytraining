@@ -17,8 +17,14 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-RUN apk add --no-cache openssl
-RUN addgroup -S app && adduser -S app -G app
+RUN apk add --no-cache openssl shadow
+# `docker` group with the same GID as the host so the bind-mounted
+# /var/run/docker.sock is accessible to the non-root `app` user.
+# Override at build time with --build-arg DOCKER_GID=<host gid> if needed.
+ARG DOCKER_GID=999
+RUN addgroup -S app && adduser -S app -G app && \
+    (getent group docker >/dev/null || addgroup -g ${DOCKER_GID} docker) && \
+    adduser app docker
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
