@@ -115,22 +115,37 @@ process_demo() {
   docker exec "$WP" wp --allow-root option update siteurl "http://${HOST_IP}:${PORT}" >/dev/null 2>&1 || true
   docker exec "$WP" wp --allow-root option update home    "http://${HOST_IP}:${PORT}" >/dev/null 2>&1 || true
 
-  # Capture the golden snapshot
-  ROOT_PW=$(docker exec "$DB" printenv MYSQL_ROOT_PASSWORD)
-  if [ -z "$ROOT_PW" ]; then
-    echo "  ✗ Could not read MYSQL_ROOT_PASSWORD from $DB — skipping snapshot"
+  # Find the DB credentials to use. Try (in order):
+  #   1. MARIADB_ROOT_PASSWORD on the DB container
+  #   2. MYSQL_ROOT_PASSWORD on the DB container
+  #   3. WORDPRESS_DB_USER + WORDPRESS_DB_PASSWORD from the WP container
+  DB_USER="root"
+  DB_PW=$(docker exec "$DB" printenv MARIADB_ROOT_PASSWORD 2>/dev/null || true)
+  if [ -z "$DB_PW" ]; then
+    DB_PW=$(docker exec "$DB" printenv MYSQL_ROOT_PASSWORD 2>/dev/null || true)
+  fi
+  if [ -z "$DB_PW" ]; then
+    DB_USER=$(docker exec "$WP" printenv WORDPRESS_DB_USER 2>/dev/null || true)
+    DB_PW=$(docker exec "$WP" printenv WORDPRESS_DB_PASSWORD 2>/dev/null || true)
+  fi
+  if [ -z "$DB_PW" ]; then
+    echo "  ✗ Could not find DB credentials (no MARIADB_ROOT_PASSWORD / MYSQL_ROOT_PASSWORD on $DB,"
+    echo "    no WORDPRESS_DB_USER/PASSWORD on $WP). Run:"
+    echo "      docker exec $DB printenv | grep -i -E 'maria|mysql|password'"
+    echo "    to see what's actually set, then ask for help."
     FAILED_DEMOS+=("$i")
     return 0
   fi
+
   # mariadb-dump on MariaDB 11; on older images this might be mysqldump
-  if docker exec "$DB" sh -c "command -v mariadb-dump >/dev/null"; then
+  if docker exec "$DB" sh -c "command -v mariadb-dump >/dev/null 2>&1"; then
     DUMP_CMD="mariadb-dump"
   else
     DUMP_CMD="mysqldump"
   fi
-  if ! docker exec "$DB" sh -c "$DUMP_CMD --skip-comments --no-tablespaces -u root -p'$ROOT_PW' wordpress" \
-      > "$SQL_FILE.tmp" 2>/dev/null; then
-    echo "  ✗ Failed to dump $DB — skipping"
+  if ! docker exec "$DB" sh -c "$DUMP_CMD --skip-comments --no-tablespaces -u '$DB_USER' -p'$DB_PW' wordpress" \
+      > "$SQL_FILE.tmp" 2>/tmp/tt-wp-bootstrap-dump-err-${i}.log; then
+    echo "  ✗ Failed to dump $DB (using $DB_USER) — see /tmp/tt-wp-bootstrap-dump-err-${i}.log"
     rm -f "$SQL_FILE.tmp"
     FAILED_DEMOS+=("$i")
     return 0
