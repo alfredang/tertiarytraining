@@ -10,9 +10,10 @@ export default async function LearnerDashboard() {
   if (user.role !== "LEARNER" && user.role !== "ADMIN")
     redirect(`/dashboard/${user.role.toLowerCase()}`);
 
-  // Learners see only containers in environments explicitly assigned to them
-  // (via EnvironmentAssignment) OR containers individually assigned to them.
-  // Admins previewing this dashboard see everything.
+  // Learners see all containers under environments explicitly assigned
+  // to them (via EnvironmentAssignment). Access is environment-scoped —
+  // per-container assignment has been removed for simplicity.
+  // Admins previewing this dashboard see every container.
   let containers;
   if (user.role === "ADMIN") {
     containers = await prisma.dockerContainer.findMany({
@@ -26,12 +27,7 @@ export default async function LearnerDashboard() {
     });
     const envIds = assignments.map((a) => a.environmentId);
     containers = await prisma.dockerContainer.findMany({
-      where: {
-        OR: [
-          { assignedUserId: user.id },
-          { environmentId: { in: envIds }, environment: { enabled: true } },
-        ],
-      },
+      where: { environmentId: { in: envIds }, environment: { enabled: true } },
       include: { environment: true },
       orderBy: [{ environment: { name: "asc" } }, { name: "asc" }],
     });

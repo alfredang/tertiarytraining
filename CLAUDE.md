@@ -46,11 +46,11 @@ This is the *most important* concept and the visibility rules have changed over 
 - Approve / reject via `/api/admin/approve-user` and `/api/admin/reject-user`. Both endpoints are open to **`ADMIN` and `TRAINER`**, but trainers may only approve/reject `LEARNER` accounts (enforced server-side).
 - Account expiry (`User.expiresAt`): learners get `now + default_signup_validity_days` (a `SystemSetting`, default 7) on signup. **Trainers never expire** — `expiresAt` is forced to `null` whenever their role is set. Expired non-trainer users are blocked at login.
 - Extend via `/api/admin/extend-user`. Admin can extend anyone (except trainers — trainers don't have expiry); trainer can only extend learners.
-- **Visibility on the dashboards**:
-  - **Learner** sees containers where `assignedUserId = self` OR where the container's environment has an `EnvironmentAssignment` for them.
+- **Visibility on the dashboards** (environment-scoped only — per-container assignment was removed for simplicity):
+  - **Learner** sees every container under environments that have an `EnvironmentAssignment` for them.
   - **Trainer** sees only environments that have an `EnvironmentAssignment` for them, and may refresh containers under those environments.
-  - **Admin** sees everything; the admin "View as" topbar dropdown lets them preview any role's dashboard (admin role bypasses the middleware role check).
-- `EnvironmentAssignment` is the primary way to grant access. Manage via the "Envs" button on `/admin/users` (calls `GET/PUT /api/users/[id]/environments`).
+  - **Admin** sees everything; the admin "View as" topbar buttons let them preview any role's dashboard (admin role bypasses the middleware role check).
+- `EnvironmentAssignment` is the **only** way to grant access. Manage via the "Envs" button on `/admin/users` (calls `GET/PUT /api/users/[id]/environments`). The `DockerContainer.assignedUserId` column still exists in the schema but is no longer surfaced in the admin UI — new containers are created with `assignedUserId = null`.
 
 ### Auth
 

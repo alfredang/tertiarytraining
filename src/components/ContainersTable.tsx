@@ -6,7 +6,6 @@ import { Modal, ConfirmDialog } from "./Modal";
 import { StatusBadge } from "./StatusBadge";
 
 type Env = { id: string; name: string; defaultPort: number; accessUrl: string };
-type User = { id: string; name: string; email: string; role: string };
 type Container = {
   id: string;
   name: string;
@@ -14,19 +13,16 @@ type Container = {
   environment: { name: string };
   containerUrl: string;
   port: number;
-  assignedUserId: string | null;
-  assignedUser: { id: string; name: string; email: string } | null;
   status: string;
   lastRefreshedAt: string | null;
 };
 
-const empty = { name: "", environmentId: "", containerUrl: "", port: 8080, assignedUserId: "" as string | "" };
+const empty = { name: "", environmentId: "", containerUrl: "", port: 8080 };
 
 export function ContainersTable() {
   const toast = useToast();
   const [containers, setContainers] = useState<Container[]>([]);
   const [envs, setEnvs] = useState<Env[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Container | null>(null);
@@ -37,14 +33,12 @@ export function ContainersTable() {
 
   async function load() {
     setLoading(true);
-    const [c, e, u] = await Promise.all([
+    const [c, e] = await Promise.all([
       fetch("/api/containers").then((r) => r.json()),
       fetch("/api/environments").then((r) => r.json()),
-      fetch("/api/users").then((r) => r.json()),
     ]);
     setContainers(c.containers ?? []);
     setEnvs(e.environments ?? []);
-    setUsers(u.users ?? []);
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
@@ -66,7 +60,6 @@ export function ContainersTable() {
       environmentId: c.environmentId,
       containerUrl: c.containerUrl,
       port: c.port,
-      assignedUserId: c.assignedUserId ?? "",
     });
     setOpen(true);
   }
@@ -75,7 +68,8 @@ export function ContainersTable() {
     e.preventDefault();
     const url = editing ? `/api/containers/${editing.id}` : "/api/containers";
     const method = editing ? "PUT" : "POST";
-    const body = { ...form, assignedUserId: form.assignedUserId || null };
+    // assignedUserId is intentionally omitted — access is managed via Environment assignments
+    const body = { ...form, assignedUserId: null };
     const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const data = await res.json();
     if (!res.ok) { toast.push("error", data.error ?? "Save failed"); return; }
@@ -129,6 +123,14 @@ export function ContainersTable() {
 
   return (
     <div>
+      <div className="mb-2 rounded-lg border border-zinc-700 bg-zinc-800/40 p-3 text-xs text-zinc-300">
+        ℹ️ Access is managed per <strong>environment</strong>, not per container.
+        Assign environments to users from{" "}
+        <a href="/admin/users" className="text-indigo-400 hover:underline">
+          Admin → Users → Envs
+        </a>
+        . Anyone assigned to an environment automatically sees every container under it.
+      </div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select value={filterEnv} onChange={(e) => setFilterEnv(e.target.value)} className="max-w-xs">
           <option value="ALL">All environments</option>
@@ -150,7 +152,6 @@ export function ContainersTable() {
               <th className="text-left px-4 py-2">Name</th>
               <th className="text-left px-4 py-2">Environment</th>
               <th className="text-left px-4 py-2">URL</th>
-              <th className="text-left px-4 py-2">Assigned to</th>
               <th className="text-left px-4 py-2">Status</th>
               <th className="text-left px-4 py-2">Refreshed</th>
               <th className="text-right px-4 py-2">Actions</th>
@@ -158,9 +159,9 @@ export function ContainersTable() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-zinc-500">Loading…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-zinc-500">Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-zinc-500">No containers.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-zinc-500">No containers.</td></tr>
             ) : filtered.map((c) => (
               <tr key={c.id} className="border-t border-zinc-800">
                 <td className="px-4 py-2">{c.name}</td>
@@ -170,7 +171,6 @@ export function ContainersTable() {
                     {c.containerUrl}
                   </a>
                 </td>
-                <td className="px-4 py-2 text-zinc-400">{c.assignedUser?.email ?? "—"}</td>
                 <td className="px-4 py-2"><StatusBadge status={c.status} /></td>
                 <td className="px-4 py-2 text-zinc-400">{c.lastRefreshedAt ? new Date(c.lastRefreshedAt).toLocaleString() : "—"}</td>
                 <td className="px-4 py-2 text-right whitespace-nowrap">
@@ -201,15 +201,10 @@ export function ContainersTable() {
             <div><label className="text-xs text-zinc-400">Container URL</label><input value={form.containerUrl} onChange={(e) => setForm({ ...form, containerUrl: e.target.value })} required /></div>
             <div><label className="text-xs text-zinc-400">Port</label><input type="number" value={form.port} onChange={(e) => setForm({ ...form, port: Number(e.target.value) })} required /></div>
           </div>
-          <div>
-            <label className="text-xs text-zinc-400">Assign to user (optional)</label>
-            <select value={form.assignedUserId} onChange={(e) => setForm({ ...form, assignedUserId: e.target.value })}>
-              <option value="">— Unassigned —</option>
-              {users.filter(u => u.role !== "ADMIN").map((u) => (
-                <option key={u.id} value={u.id}>{u.name} ({u.email}) · {u.role}</option>
-              ))}
-            </select>
-          </div>
+          <p className="text-xs text-zinc-500">
+            Access is granted by assigning the container&apos;s environment to a user in{" "}
+            <a href="/admin/users" className="text-indigo-400 hover:underline">Users → Envs</a>.
+          </p>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>Cancel</button>
             <button className="btn btn-primary">{editing ? "Save" : "Create"}</button>
