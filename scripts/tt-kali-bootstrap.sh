@@ -1,22 +1,12 @@
 #!/bin/bash
 #
 # tt-kali-bootstrap.sh — run 5 Kali Linux desktop containers (web GUI via
-# linuxserver/kali-linux) on ports 8096..8100.
-#
-# Each container is a full Kali Linux rolling release with web desktop.
-# Out of the box only the base Kali system is installed — learners can
-# `sudo apt-get install kali-tools-everything` (or specific metapackages
-# like kali-tools-top10, kali-tools-web) to add the offensive security
-# toolchain.
-#
-# Run ONCE on the Coolify host as root. Re-run anytime to recreate.
-#
-# WARNING: the Kali image is ~5 GB. First pull will take a while.
+# linuxserver/kali-linux), accessed via the reverse-proxied HTTPS paths
+# https://www.tertiarytraining.com/lab/kali-1/ ... kali-5/.
 
 set -uo pipefail
 
 IMAGE="${IMAGE:-lscr.io/linuxserver/kali-linux:latest}"
-HOST_IP="${HOST_IP:-168.231.119.201}"
 TZ="${TZ:-Asia/Singapore}"
 
 if [ "$EUID" -ne 0 ]; then
@@ -33,6 +23,7 @@ declare -a FAILED_DEMOS=()
 for i in 1 2 3 4 5; do
   PORT=$((8095 + i))
   NAME="kali-demo${i}"
+  SUBFOLDER="/lab/kali-${i}/"
 
   if docker ps -a --format '{{.Names}}' | grep -q "^${NAME}$"; then
     echo "  Removing existing ${NAME}…"
@@ -45,11 +36,12 @@ for i in 1 2 3 4 5; do
       --restart unless-stopped \
       --security-opt seccomp=unconfined \
       --shm-size="1gb" \
-      -p "${PORT}:3000" \
+      -p "127.0.0.1:${PORT}:3000" \
       -e PUID=1000 -e PGID=1000 \
       -e TZ="$TZ" \
+      -e SUBFOLDER="$SUBFOLDER" \
       "$IMAGE" >/dev/null; then
-    echo "  ✓ ${NAME} → http://${HOST_IP}:${PORT}/"
+    echo "  ✓ ${NAME} → https://www.tertiarytraining.com${SUBFOLDER}"
     OK_DEMOS+=("$i")
   else
     echo "  ✗ Failed to start ${NAME}"
@@ -63,15 +55,11 @@ echo "  OK:     ${#OK_DEMOS[@]} (${OK_DEMOS[*]:-none})"
 echo "  Failed: ${#FAILED_DEMOS[@]} (${FAILED_DEMOS[*]:-none})"
 echo
 if [ ${#OK_DEMOS[@]} -gt 0 ]; then
-  echo "Open any of these URLs in a browser (give it ~30s on first boot):"
+  echo "After running scripts/tt-nginx-labs-apply.sh, open:"
   for i in "${OK_DEMOS[@]}"; do
-    PORT=$((8095 + i))
-    echo "  http://${HOST_IP}:${PORT}/"
+    echo "  https://www.tertiarytraining.com/lab/kali-${i}/"
   done
   echo
-  echo "Each one drops you into a full Kali Linux desktop in the browser."
-  echo "Install Kali toolsets via:"
-  echo "  sudo apt-get update"
-  echo "  sudo apt-get install -y kali-tools-top10        # ~1 GB, popular tools"
-  echo "  sudo apt-get install -y kali-tools-everything    # ~9 GB, full Kali"
+  echo "Install Kali toolsets inside a demo:"
+  echo "  sudo apt-get update && sudo apt-get install -y kali-tools-top10"
 fi

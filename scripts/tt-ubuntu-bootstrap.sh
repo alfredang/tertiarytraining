@@ -1,19 +1,17 @@
 #!/bin/bash
 #
 # tt-ubuntu-bootstrap.sh — run 5 Ubuntu XFCE desktop containers (web GUI via
-# linuxserver/webtop) on ports 8091..8095.
+# linuxserver/webtop), accessed via the reverse-proxied HTTPS paths
+# https://www.tertiarytraining.com/lab/ubuntu-1/ ... ubuntu-5/.
 #
-# Each container exposes a full browser-accessible Ubuntu desktop. Learners
-# can launch apps, open a terminal, install software (sudo apt-get install …),
-# etc. — exactly like a normal Ubuntu desktop, but in a browser tab.
-#
-# Run ONCE on the Coolify host as root. Re-run anytime to refresh / recreate
-# all 5 demo containers.
+# Each container listens on internal port 3000 (HTTP). The host nginx vhost
+# (see scripts/tt-nginx-labs-apply.sh) does HTTPS termination and forwards
+# /lab/ubuntu-N/ to host port 809{1..5}. The container is told via the
+# SUBFOLDER env var so Selkies generates correct asset URLs.
 
 set -uo pipefail
 
 IMAGE="${IMAGE:-lscr.io/linuxserver/webtop:ubuntu-xfce}"
-HOST_IP="${HOST_IP:-168.231.119.201}"
 TZ="${TZ:-Asia/Singapore}"
 
 if [ "$EUID" -ne 0 ]; then
@@ -30,6 +28,7 @@ declare -a FAILED_DEMOS=()
 for i in 1 2 3 4 5; do
   PORT=$((8090 + i))
   NAME="ubuntu-demo${i}"
+  SUBFOLDER="/lab/ubuntu-${i}/"
 
   if docker ps -a --format '{{.Names}}' | grep -q "^${NAME}$"; then
     echo "  Removing existing ${NAME}…"
@@ -42,11 +41,12 @@ for i in 1 2 3 4 5; do
       --restart unless-stopped \
       --security-opt seccomp=unconfined \
       --shm-size="1gb" \
-      -p "${PORT}:3000" \
+      -p "127.0.0.1:${PORT}:3000" \
       -e PUID=1000 -e PGID=1000 \
       -e TZ="$TZ" \
+      -e SUBFOLDER="$SUBFOLDER" \
       "$IMAGE" >/dev/null; then
-    echo "  ✓ ${NAME} → http://${HOST_IP}:${PORT}/"
+    echo "  ✓ ${NAME} → https://www.tertiarytraining.com${SUBFOLDER}"
     OK_DEMOS+=("$i")
   else
     echo "  ✗ Failed to start ${NAME}"
@@ -60,12 +60,8 @@ echo "  OK:     ${#OK_DEMOS[@]} (${OK_DEMOS[*]:-none})"
 echo "  Failed: ${#FAILED_DEMOS[@]} (${FAILED_DEMOS[*]:-none})"
 echo
 if [ ${#OK_DEMOS[@]} -gt 0 ]; then
-  echo "Open any of these URLs in a browser (give it ~20s on first boot):"
+  echo "After running scripts/tt-nginx-labs-apply.sh, open:"
   for i in "${OK_DEMOS[@]}"; do
-    PORT=$((8090 + i))
-    echo "  http://${HOST_IP}:${PORT}/"
+    echo "  https://www.tertiarytraining.com/lab/ubuntu-${i}/"
   done
-  echo
-  echo "You'll land on a full Ubuntu XFCE desktop. Right-click → Open Terminal"
-  echo "to get a shell. Run 'sudo apt-get install …' to add software."
 fi
