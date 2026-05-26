@@ -8,11 +8,8 @@ export default async function Page() {
   return (
     <DashboardShell user={{ name: user.name, email: user.email, role: user.role }} nav={adminNav}>
       <h1 className="text-2xl font-semibold mb-6">Settings</h1>
-      <div className="space-y-6 max-w-2xl">
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-          <h2 className="font-semibold mb-3">Account expiry</h2>
-          <SettingsForm />
-        </section>
+      <SettingsForm />
+      <div className="space-y-6 max-w-2xl mt-6">
         <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
           <h2 className="font-semibold mb-2">System</h2>
           <dl className="grid grid-cols-2 gap-y-2 text-sm">

@@ -2,10 +2,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/components/Toast";
 import { Footer } from "@/components/Footer";
 import { Modal } from "@/components/Modal";
+
+const OAUTH_ERROR_LABELS: Record<string, string> = {
+  google_not_configured: "Google sign-in is not configured. Ask an admin.",
+  state_mismatch: "OAuth state mismatch. Please try again.",
+  missing_state: "OAuth session expired. Please try again.",
+  token_exchange_failed: "Google rejected the authorization. Please try again.",
+  userinfo_failed: "Could not read your Google profile. Please try again.",
+  email_not_verified: "Your Google account email is not verified.",
+  account_rejected: "Your account was rejected.",
+  account_suspended: "Your account is suspended.",
+  account_expired: "Your account has expired. Ask a trainer or admin to extend it.",
+};
 
 type Role = "LEARNER" | "TRAINER";
 
@@ -13,6 +25,23 @@ export default function LoginPage() {
   const router = useRouter();
   const toast = useToast();
   const [tab, setTab] = useState<"password" | "otp">("password");
+
+  // Surface OAuth callback messages on first render (read from window
+  // directly to avoid wrapping the whole page in a Suspense boundary
+  // for useSearchParams).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get("oauth_error");
+    if (err) {
+      toast.push("error", OAUTH_ERROR_LABELS[err] ?? `Sign-in failed (${err})`);
+    }
+    if (params.get("oauth_pending")) {
+      toast.push("info", "Account created — awaiting admin/trainer approval. You'll be able to sign in once approved.");
+    }
+    // We intentionally fire toasts only on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -148,17 +177,15 @@ export default function LoginPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-2">
+              <a className="btn btn-ghost" href="/api/auth/oauth/google">
+                Continue with Google
+              </a>
               <button
+                type="button"
                 className="btn btn-ghost"
-                onClick={() => toast.push("info", "Configure OAuth provider to enable Google sign-in.")}
+                onClick={() => toast.push("info", "GitHub sign-in: configure Client ID + Secret in Admin → Settings to enable.")}
               >
-                Google
-              </button>
-              <button
-                className="btn btn-ghost"
-                onClick={() => toast.push("info", "Configure OAuth provider to enable GitHub sign-in.")}
-              >
-                GitHub
+                Continue with GitHub
               </button>
             </div>
 
@@ -250,17 +277,13 @@ export default function LoginPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-2">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => toast.push("info", "Configure OAuth provider to enable Google sign-up.")}
-              >
+              <a className="btn btn-ghost text-center" href="/api/auth/oauth/google">
                 Sign up with Google
-              </button>
+              </a>
               <button
                 type="button"
                 className="btn btn-ghost"
-                onClick={() => toast.push("info", "Configure OAuth provider to enable GitHub sign-up.")}
+                onClick={() => toast.push("info", "GitHub sign-up: configure Client ID + Secret in Admin → Settings to enable.")}
               >
                 Sign up with GitHub
               </button>

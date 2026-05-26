@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "arctic": "^2.3.4",
     "bcryptjs": "^2.4.3",
     "dockerode": "^4.0.2",
     "jose": "^5.9.6",
