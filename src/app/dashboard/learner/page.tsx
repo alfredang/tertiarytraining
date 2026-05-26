@@ -7,10 +7,12 @@ import { EnvironmentCard } from "@/components/EnvironmentCard";
 export default async function LearnerDashboard() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  if (user.role !== "LEARNER") redirect(`/dashboard/${user.role.toLowerCase()}`);
+  if (user.role !== "LEARNER" && user.role !== "ADMIN")
+    redirect(`/dashboard/${user.role.toLowerCase()}`);
 
+  // Admins viewing the learner dashboard see all containers as a preview.
   const containers = await prisma.dockerContainer.findMany({
-    where: { assignedUserId: user.id },
+    where: user.role === "ADMIN" ? {} : { assignedUserId: user.id },
     include: { environment: true },
     orderBy: { createdAt: "desc" },
   });

@@ -7,16 +7,18 @@ import { TrainerEnvList } from "@/components/TrainerEnvList";
 export default async function TrainerDashboard() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  if (user.role !== "TRAINER") redirect(`/dashboard/${user.role.toLowerCase()}`);
+  if (user.role !== "TRAINER" && user.role !== "ADMIN")
+    redirect(`/dashboard/${user.role.toLowerCase()}`);
 
-  const assignments = await prisma.environmentAssignment.findMany({
-    where: { userId: user.id },
-    include: {
-      environment: {
+  // Admins previewing the trainer dashboard see every environment.
+  const assignments = user.role === "ADMIN"
+    ? (await prisma.environment.findMany({
         include: { containers: true },
-      },
-    },
-  });
+      })).map((env) => ({ environment: env }))
+    : await prisma.environmentAssignment.findMany({
+        where: { userId: user.id },
+        include: { environment: { include: { containers: true } } },
+      });
 
   const envs = assignments.map((a) => ({
     environmentId: a.environment.id,

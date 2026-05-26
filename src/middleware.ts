@@ -27,18 +27,21 @@ export async function middleware(req: NextRequest) {
       url.pathname = "/login";
       return NextResponse.redirect(url);
     }
-    // Enforce role match for own dashboard routes
-    if (pathname.startsWith("/dashboard/learner") && role !== "LEARNER") {
-      return NextResponse.redirect(new URL(`/dashboard/${role.toLowerCase()}`, req.url));
-    }
-    if (pathname.startsWith("/dashboard/trainer") && role !== "TRAINER") {
-      return NextResponse.redirect(new URL(`/dashboard/${role.toLowerCase()}`, req.url));
-    }
-    if (pathname.startsWith("/dashboard/admin") && role !== "ADMIN") {
-      return NextResponse.redirect(new URL(`/dashboard/${role.toLowerCase()}`, req.url));
-    }
-    if (pathname.startsWith("/admin") && role !== "ADMIN") {
-      return NextResponse.redirect(new URL(`/dashboard/${role.toLowerCase()}`, req.url));
+    // Admins can view any dashboard / admin route.
+    // Non-admins are restricted to their own dashboard.
+    if (role !== "ADMIN") {
+      if (pathname.startsWith("/dashboard/learner") && role !== "LEARNER") {
+        return NextResponse.redirect(new URL(`/dashboard/${role.toLowerCase()}`, req.url));
+      }
+      if (pathname.startsWith("/dashboard/trainer") && role !== "TRAINER") {
+        return NextResponse.redirect(new URL(`/dashboard/${role.toLowerCase()}`, req.url));
+      }
+      if (pathname.startsWith("/dashboard/admin")) {
+        return NextResponse.redirect(new URL(`/dashboard/${role.toLowerCase()}`, req.url));
+      }
+      if (pathname.startsWith("/admin")) {
+        return NextResponse.redirect(new URL(`/dashboard/${role.toLowerCase()}`, req.url));
+      }
     }
   }
 

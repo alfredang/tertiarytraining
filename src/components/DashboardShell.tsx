@@ -76,6 +76,22 @@ export function DashboardShell({
             {pathname}
           </div>
           <div className="flex items-center gap-3">
+            {user.role === "ADMIN" && (
+              <select
+                aria-label="View as"
+                className="max-w-[160px] py-1.5"
+                value={
+                  pathname.startsWith("/dashboard/learner") ? "/dashboard/learner" :
+                  pathname.startsWith("/dashboard/trainer") ? "/dashboard/trainer" :
+                  "/dashboard/admin"
+                }
+                onChange={(e) => router.push(e.target.value)}
+              >
+                <option value="/dashboard/admin">View as: Admin</option>
+                <option value="/dashboard/trainer">View as: Trainer</option>
+                <option value="/dashboard/learner">View as: Learner</option>
+              </select>
+            )}
             <div className="text-right text-xs">
               <div className="font-medium text-zinc-100">{user.name}</div>
               <div className="text-zinc-500">{user.email} · {user.role}</div>
