@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  LEARNER
+  TRAINER
+  ADMIN
+}
+
+enum AccountStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
+enum ContainerStatus {
+  RUNNING
+  STOPPED
+  REFRESHING
+  ERROR
+}
+
+enum RefreshScope {
+  ONE
+  ENV
+  CLASS
+  ALL
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String
+  passwordHash  String
+  role          Role          @default(LEARNER)
+  status        AccountStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  containers    DockerContainer[]    @relation("AssignedUser")
+  assignments   EnvironmentAssignment[]
+  refreshLogs   RefreshLog[]
+  auditLogs     AuditLog[]
+}
+
+model Environment {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  description  String
+  dockerImage  String
+  defaultPort  Int
+  accessUrl    String
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  containers   DockerContainer[]
+  assignments  EnvironmentAssignment[]
+}
+
+model DockerContainer {
+  id               String          @id @default(cuid())
+  name             String          @unique
+  environmentId    String
+  environment      Environment     @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  containerUrl     String
+  port             Int
+  assignedUserId   String?
+  assignedUser     User?           @relation("AssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  status           ContainerStatus @default(STOPPED)
+  lastRefreshedAt  DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model EnvironmentAssignment {
+  id             String      @id @default(cuid())
+  environmentId  String
+  environment    Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupName      String?
+  createdAt      DateTime    @default(now())
+
+  @@unique([environmentId, userId])
+}
+
+model RefreshLog {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope          RefreshScope
+  targetId       String?
+  environmentId  String?
+  status         String
+  message        String?
+  createdAt      DateTime     @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  entity     String
+  entityId   String?
+  meta       Json?
+  createdAt  DateTime @default(now())
+}
