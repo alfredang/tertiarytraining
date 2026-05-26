@@ -17,14 +17,8 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-RUN apk add --no-cache openssl shadow
-# `docker` group with the same GID as the host so the bind-mounted
-# /var/run/docker.sock is accessible to the non-root `app` user.
-# Override at build time with --build-arg DOCKER_GID=<host gid> if needed.
-ARG DOCKER_GID=999
-RUN addgroup -S app && adduser -S app -G app && \
-    (getent group docker >/dev/null || addgroup -g ${DOCKER_GID} docker) && \
-    adduser app docker
+RUN apk add --no-cache openssl shadow su-exec
+RUN addgroup -S app && adduser -S app -G app
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
@@ -35,10 +29,15 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 # Bundle the local Prisma 5 CLI so the runtime doesn't fetch a newer (incompatible) version.
 # Invoke via the real path (not the .bin/ symlink) so Prisma can locate its sibling WASM files.
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+# Entrypoint runs as root: it joins the `app` user to the docker.sock group
+# (if a socket is mounted) and then drops privileges via su-exec.
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
+    chown -R app:app /app
 
-USER app
 EXPOSE 3000
 ENV PORT=3000 HOSTNAME=0.0.0.0
 
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 # Run migrations on startup, then the Next.js server.
 CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node server.js"]
