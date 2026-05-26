@@ -2,10 +2,54 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useTransition } from "react";
 import { cn } from "@/lib/utils";
 
 export type NavItem = { href: string; label: string; icon?: string };
+
+function ViewAsSwitcher({ pathname }: { pathname: string }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const current =
+    pathname.startsWith("/dashboard/learner") ? "LEARNER" :
+    pathname.startsWith("/dashboard/trainer") ? "TRAINER" :
+    "ADMIN";
+
+  const targets = [
+    { role: "ADMIN" as const,   href: "/dashboard/admin",   label: "Admin" },
+    { role: "TRAINER" as const, href: "/dashboard/trainer", label: "Trainer" },
+    { role: "LEARNER" as const, href: "/dashboard/learner", label: "Learner" },
+  ];
+
+  function switchTo(href: string) {
+    startTransition(() => {
+      router.push(href);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="hidden sm:flex items-center gap-1 rounded-lg bg-zinc-800/60 p-1 text-xs">
+      <span className="px-2 text-zinc-500 hidden md:inline">View as:</span>
+      {targets.map((t) => (
+        <button
+          key={t.role}
+          type="button"
+          onClick={() => switchTo(t.href)}
+          disabled={pending}
+          className={cn(
+            "px-3 py-1 rounded-md transition-colors",
+            current === t.role
+              ? "bg-zinc-900 text-zinc-100"
+              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800",
+          )}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function DashboardShell({
   user,
@@ -77,20 +121,7 @@ export function DashboardShell({
           </div>
           <div className="flex items-center gap-3">
             {user.role === "ADMIN" && (
-              <select
-                aria-label="View as"
-                className="max-w-[160px] py-1.5"
-                value={
-                  pathname.startsWith("/dashboard/learner") ? "/dashboard/learner" :
-                  pathname.startsWith("/dashboard/trainer") ? "/dashboard/trainer" :
-                  "/dashboard/admin"
-                }
-                onChange={(e) => router.push(e.target.value)}
-              >
-                <option value="/dashboard/admin">View as: Admin</option>
-                <option value="/dashboard/trainer">View as: Trainer</option>
-                <option value="/dashboard/learner">View as: Learner</option>
-              </select>
+              <ViewAsSwitcher pathname={pathname} />
             )}
             <div className="text-right text-xs">
               <div className="font-medium text-zinc-100">{user.name}</div>
