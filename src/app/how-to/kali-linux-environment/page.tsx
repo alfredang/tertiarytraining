@@ -6,11 +6,11 @@ import { DashboardShell } from "@/components/DashboardShell";
 import { navForRole } from "@/lib/adminNav";
 
 const demos = [
-  { name: "Ubuntu Demo 1", url: "http://168.231.119.201:8091/" },
-  { name: "Ubuntu Demo 2", url: "http://168.231.119.201:8092/" },
-  { name: "Ubuntu Demo 3", url: "http://168.231.119.201:8093/" },
-  { name: "Ubuntu Demo 4", url: "http://168.231.119.201:8094/" },
-  { name: "Ubuntu Demo 5", url: "http://168.231.119.201:8095/" },
+  { name: "Kali Demo 1", url: "http://168.231.119.201:8096/" },
+  { name: "Kali Demo 2", url: "http://168.231.119.201:8097/" },
+  { name: "Kali Demo 3", url: "http://168.231.119.201:8098/" },
+  { name: "Kali Demo 4", url: "http://168.231.119.201:8099/" },
+  { name: "Kali Demo 5", url: "http://168.231.119.201:8100/" },
 ];
 
 export default async function Page() {
@@ -26,23 +26,22 @@ export default async function Page() {
           <Link href="/how-to" className="hover:text-zinc-300">
             How To
           </Link>{" "}
-          / Ubuntu Environment
+          / Kali Linux Environment
         </nav>
 
-        <h1 className="text-2xl font-semibold mb-1">Ubuntu Environment</h1>
+        <h1 className="text-2xl font-semibold mb-1">Kali Linux Environment</h1>
         <p className="text-sm text-zinc-400 mb-8">
-          5 independent Ubuntu 24.04 desktop containers, accessed via a full
-          web-based XFCE GUI (powered by{" "}
+          5 independent Kali Linux rolling-release desktop containers (
           <a
-            href="https://docs.linuxserver.io/images/docker-webtop/"
+            href="https://docs.linuxserver.io/images/docker-kali-linux/"
             target="_blank"
             rel="noreferrer"
             className="text-indigo-400 hover:underline"
           >
-            linuxserver/webtop
+            linuxserver/kali-linux
           </a>
-          ). Learners get a real Ubuntu desktop in their browser — file manager,
-          terminal, browser, install anything via apt.
+          ). Each opens a full Kali XFCE desktop in the browser — for
+          offensive-security / CTF training.
         </p>
 
         <div className="space-y-8 text-sm leading-relaxed">
@@ -73,48 +72,48 @@ export default async function Page() {
               </tbody>
             </table>
             <p className="text-xs text-zinc-500">
-              First boot of each container takes ~20 seconds to come up. After
-              that, page loads are near-instant.
+              First boot ~30 s. The base image is large (~5 GB pulled
+              once on the host).
             </p>
           </Section>
 
-          <Section title="What learners get">
-            <ul className="list-disc pl-5 space-y-1">
-              <li>
-                <strong>Ubuntu 24.04 LTS</strong> with the full XFCE desktop
-                environment
-              </li>
-              <li>
-                Pre-installed: Firefox, file manager, terminal (right-click
-                desktop → Open Terminal Here)
-              </li>
-              <li>
-                Passwordless <code>sudo</code> as the default user
-              </li>
-              <li>
-                Persistent inside the session; wiped on Refresh
-              </li>
-            </ul>
-            <p className="text-xs text-zinc-500">
-              Node.js, Python, etc. are <strong>not</strong> preinstalled —
-              the webtop image stays slim. Learners (or the admin via a
-              custom image) can install whatever they need:
+          <Section title="Installing the Kali toolsets">
+            <p>
+              The base image ships only the Kali rolling system + desktop —
+              no offensive tooling. Inside a Kali demo, open a terminal and
+              install what you need:
             </p>
             <pre className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs overflow-x-auto">
-{`# In the in-browser terminal:
-sudo apt-get update
-sudo apt-get install -y nodejs npm
-sudo apt-get install -y python3-pip
-# …or anything else from the Ubuntu repos`}
+{`sudo apt-get update
+
+# Popular individual metapackages:
+sudo apt-get install -y kali-tools-top10          # ~1 GB
+sudo apt-get install -y kali-tools-web            # web hacking
+sudo apt-get install -y kali-tools-passwords      # password attacks
+sudo apt-get install -y kali-tools-wireless       # wireless
+sudo apt-get install -y kali-tools-forensics      # forensics
+
+# Or everything at once (heavy, ~9 GB extra):
+sudo apt-get install -y kali-tools-everything`}
             </pre>
+            <p className="text-xs text-zinc-400">
+              Installed tools are <strong>wiped on Refresh</strong>. For
+              long-term setups, bake them into a custom image (see{" "}
+              <Link
+                href="/how-to/enable-real-docker"
+                className="text-indigo-400 hover:underline"
+              >
+                Enable Real Docker Control
+              </Link>{" "}
+              for the pattern used by the WordPress demos).
+            </p>
           </Section>
 
-          <Section title="Refreshing an Ubuntu container">
+          <Section title="Refreshing a Kali container">
             <p>
-              Refresh does a full <strong>stop + remove + recreate</strong>{" "}
-              from the <code>linuxserver/webtop:ubuntu-xfce</code> image. The
-              new container starts clean — no installed packages, no learner
-              files.
+              Refresh stops + removes the container and recreates it from
+              the base <code>linuxserver/kali-linux</code> image — fast way
+              to give learners a clean slate between exercises.
             </p>
             <ul className="list-disc pl-5 space-y-1">
               <li>
@@ -125,7 +124,7 @@ sudo apt-get install -y python3-pip
                 >
                   Admin → Containers
                 </Link>{" "}
-                → filter <strong>Ubuntu</strong> → click ↻ on a single
+                → filter <strong>Kali Linux</strong> → click ↻ on a single
                 container, or <strong>↻ Refresh by environment</strong> for
                 all five.
               </li>
@@ -137,32 +136,38 @@ sudo apt-get install -y python3-pip
                 >
                   Trainer Dashboard
                 </Link>
-                , click <strong>↻ Refresh all Ubuntu</strong>. Requires the
-                Ubuntu environment to be assigned to the trainer.
+                , click <strong>↻ Refresh all Kali Linux</strong>. Requires
+                the environment to be assigned to the trainer.
               </li>
             </ul>
-            <p className="text-xs text-zinc-400">
-              Refresh takes ~5-10 s per container. After refresh, wait
-              another ~20 s for the desktop to be ready in the browser.
-            </p>
           </Section>
 
           <Section title="Setup (one-time)">
             <p>
-              The first time you bring up the Ubuntu environment on a fresh
-              Coolify host, SSH in and run:
+              On a fresh Coolify host, SSH in and run:
             </p>
             <pre className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs overflow-x-auto">
-{`curl -sL https://raw.githubusercontent.com/alfredang/tertiarytraining/main/scripts/tt-ubuntu-bootstrap.sh \\
-  -o /usr/local/bin/tt-ubuntu-bootstrap.sh
-chmod +x /usr/local/bin/tt-ubuntu-bootstrap.sh
-/usr/local/bin/tt-ubuntu-bootstrap.sh`}
+{`curl -sL https://raw.githubusercontent.com/alfredang/tertiarytraining/main/scripts/tt-kali-bootstrap.sh \\
+  -o /usr/local/bin/tt-kali-bootstrap.sh
+chmod +x /usr/local/bin/tt-kali-bootstrap.sh
+/usr/local/bin/tt-kali-bootstrap.sh`}
             </pre>
             <p className="text-xs text-zinc-500">
-              This pulls <code>lscr.io/linuxserver/webtop:ubuntu-xfce</code>{" "}
-              (~3 GB) and runs <code>ubuntu-demo1..5</code> on host ports
-              8091..8095. Idempotent — safe to re-run.
+              Pulls the Kali image (~5 GB) and runs{" "}
+              <code>kali-demo1..5</code> on host ports 8096..8100.
+              Idempotent.
             </p>
+          </Section>
+
+          <Section title="Heads-up on resource use">
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200/90">
+              ⚠️ A single idle Kali desktop container uses ~1–2 GB of RAM.
+              Running all 5 simultaneously + 5 Ubuntu desktops + the WP
+              stack on the same VPS will be tight on an 8 GB box. If
+              learners aren&apos;t actively using all of them at once,
+              consider stopping idle containers (
+              <code>docker stop kali-demoN</code>) when not in use.
+            </div>
           </Section>
         </div>
       </div>

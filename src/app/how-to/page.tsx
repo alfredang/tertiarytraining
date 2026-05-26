@@ -24,8 +24,15 @@ const guides = [
     href: "/how-to/ubuntu-environment",
     title: "Ubuntu Environment",
     description:
-      "5 Ubuntu 24.04 lab containers with Node 24 + dev tools, accessed via a browser terminal. Install OpenClaw, Hermes, anything else.",
+      "5 Ubuntu 24.04 desktop containers (XFCE) accessed via a full browser GUI. Install software via apt as learners need it.",
     icon: "▣",
+  },
+  {
+    href: "/how-to/kali-linux-environment",
+    title: "Kali Linux Environment",
+    description:
+      "5 Kali Linux rolling desktop containers for offensive-security / CTF training. Install kali-tools-top10, web, wireless, etc.",
+    icon: "⌖",
   },
   {
     href: "/how-to/enable-real-docker",

@@ -44,11 +44,14 @@ async function main() {
 
   const ubuntu = await prisma.environment.upsert({
     where: { name: "Ubuntu" },
-    update: {},
+    update: {
+      description: "Ubuntu 24.04 XFCE desktop in the browser (linuxserver/webtop).",
+      dockerImage: "lscr.io/linuxserver/webtop:ubuntu-xfce",
+    },
     create: {
       name: "Ubuntu",
-      description: "Ubuntu 24.04 + Node 24 sandbox with browser-based bash terminal.",
-      dockerImage: "tertiary-ubuntu:latest",
+      description: "Ubuntu 24.04 XFCE desktop in the browser (linuxserver/webtop).",
+      dockerImage: "lscr.io/linuxserver/webtop:ubuntu-xfce",
       defaultPort: 8091,
       accessUrl: `http://${HOST_IP}:8091/`,
       enabled: true,
@@ -64,6 +67,36 @@ async function main() {
       create: {
         name,
         environmentId: ubuntu.id,
+        containerUrl: `http://${HOST_IP}:${port}/`,
+        port,
+        status: "RUNNING",
+      },
+    });
+    console.log(`  ✓ ${name}`);
+  }
+
+  const kali = await prisma.environment.upsert({
+    where: { name: "Kali Linux" },
+    update: {},
+    create: {
+      name: "Kali Linux",
+      description: "Kali Linux rolling desktop in the browser (linuxserver/kali-linux). Install Kali toolsets via apt as needed.",
+      dockerImage: "lscr.io/linuxserver/kali-linux:latest",
+      defaultPort: 8096,
+      accessUrl: `http://${HOST_IP}:8096/`,
+      enabled: true,
+    },
+  });
+
+  for (let i = 1; i <= 5; i++) {
+    const port = 8095 + i;
+    const name = `Kali Demo ${i}`;
+    await prisma.dockerContainer.upsert({
+      where: { name },
+      update: {},
+      create: {
+        name,
+        environmentId: kali.id,
         containerUrl: `http://${HOST_IP}:${port}/`,
         port,
         status: "RUNNING",

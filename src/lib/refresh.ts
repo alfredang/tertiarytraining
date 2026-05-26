@@ -31,17 +31,16 @@ export async function refreshOneContainer(containerId: string, actorId: string) 
       containerUrl = result.containerUrl;
     } else {
       await svc.stopAndRemove(container.name);
-      // Ubuntu/ttyd containers need the PORT env var so ttyd inside the
-      // container listens on the same port that's bound to the host.
-      const env: string[] = [];
-      if (container.environment.name === "Ubuntu") {
-        env.push(`PORT=${container.port}`);
-      }
+      // linuxserver/webtop and linuxserver/kali-linux images listen on
+      // port 3000 inside the container regardless of host port mapping.
+      const envName = container.environment.name;
+      const internalPort =
+        envName === "Ubuntu" || envName === "Kali Linux" ? 3000 : undefined;
       const result = await svc.run(
         container.environment.dockerImage,
         container.name,
         container.port,
-        env.length ? env : undefined,
+        { internalPort },
       );
       containerUrl = result.containerUrl;
     }

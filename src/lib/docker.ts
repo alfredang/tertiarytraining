@@ -25,9 +25,16 @@ export type WpContainerInfo = {
   containerUrl: string;
 };
 
+export type RunOptions = {
+  /** Env vars to pass to the container, e.g. ["PORT=8091"] */
+  env?: string[];
+  /** Port the process inside the container listens on. Defaults to `port`. */
+  internalPort?: number;
+};
+
 export interface DockerService {
   stopAndRemove(name: string): Promise<void>;
-  run(image: string, name: string, port: number, env?: string[]): Promise<RunResult>;
+  run(image: string, name: string, port: number, opts?: RunOptions): Promise<RunResult>;
   /** Optional — present in dockerode mode only. Restores the WP DB from a golden snapshot. */
   softResetWp?(info: WpContainerInfo): Promise<RunResult>;
 }
@@ -39,8 +46,12 @@ class MockDockerService implements DockerService {
   async stopAndRemove(name: string): Promise<void> {
     console.log(`[docker:mock] stop+remove ${name}`);
   }
-  async run(image: string, name: string, port: number, env?: string[]): Promise<RunResult> {
-    console.log(`[docker:mock] run ${image} as ${name} on :${port}${env?.length ? ` env=${env.join(",")}` : ""}`);
+  async run(image: string, name: string, port: number, opts?: RunOptions): Promise<RunResult> {
+    console.log(
+      `[docker:mock] run ${image} as ${name} on :${port}` +
+        (opts?.internalPort ? ` (internal :${opts.internalPort})` : "") +
+        (opts?.env?.length ? ` env=${opts.env.join(",")}` : ""),
+    );
     const base = process.env.PUBLIC_BASE_URL ?? "http://localhost";
     const token = Math.random().toString(36).slice(2, 8);
     return { containerUrl: `${base.replace(/\/$/, "")}:${port}/?s=${token}` };
@@ -67,9 +78,10 @@ class DockerodeService implements DockerService {
     }
   }
 
-  async run(image: string, name: string, port: number, env?: string[]): Promise<RunResult> {
+  async run(image: string, name: string, port: number, opts?: RunOptions): Promise<RunResult> {
+    const internalPort = opts?.internalPort ?? port;
     // Pull only if the image isn't already present locally (custom-built
-    // images like tertiary-ubuntu:latest wouldn't be on the registry).
+    // images wouldn't be on the registry).
     try {
       await this.docker.getImage(image).inspect();
     } catch {
@@ -84,17 +96,15 @@ class DockerodeService implements DockerService {
     const container = await this.docker.createContainer({
       Image: image,
       name,
-      Env: env,
-      ExposedPorts: { [`${port}/tcp`]: {} },
+      Env: opts?.env,
+      ExposedPorts: { [`${internalPort}/tcp`]: {} },
       HostConfig: {
-        PortBindings: { [`${port}/tcp`]: [{ HostPort: String(port) }] },
+        PortBindings: { [`${internalPort}/tcp`]: [{ HostPort: String(port) }] },
         RestartPolicy: { Name: "unless-stopped" },
       },
     });
     await container.start();
 
-    // For containers whose internal port matches the host port (the
-    // pattern this app uses), just point the URL at host:port.
     const host = process.env.PUBLIC_HOST_IP ?? process.env.PUBLIC_BASE_URL?.replace(/^https?:\/\//, "").replace(/\/.*$/, "") ?? "localhost";
     return { containerUrl: `http://${host}:${port}/` };
   }
