@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type NavItem = { href: string; label: string; icon?: string };
@@ -61,6 +61,21 @@ export function DashboardShell({
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Hydrate collapsed preference from localStorage on first client render.
+  useEffect(() => {
+    const stored = typeof window !== "undefined" ? localStorage.getItem("tt_sidebar_collapsed") : null;
+    if (stored === "1") setCollapsed(true);
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((v) => {
+      const next = !v;
+      try { localStorage.setItem("tt_sidebar_collapsed", next ? "1" : "0"); } catch {}
+      return next;
+    });
+  }
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -73,13 +88,22 @@ export function DashboardShell({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-30 w-64 transform border-r border-zinc-800 bg-zinc-900 transition-transform md:static md:translate-x-0",
+          "fixed inset-y-0 left-0 z-30 transform border-r border-zinc-800 bg-zinc-900 transition-[transform,width] md:static md:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
+          // Mobile drawer stays at full width; only collapse on md+
+          collapsed ? "w-64 md:w-16" : "w-64",
         )}
       >
-        <div className="flex h-16 items-center gap-2 border-b border-zinc-800 px-5">
-          <div className="h-8 w-8 rounded-lg bg-indigo-500 grid place-items-center text-sm font-bold">T</div>
-          <div className="font-semibold">Tertiary Training</div>
+        <div
+          className={cn(
+            "flex h-16 items-center gap-2 border-b border-zinc-800",
+            collapsed ? "md:justify-center md:px-2 px-5" : "px-5",
+          )}
+        >
+          <div className="h-8 w-8 rounded-lg bg-indigo-500 grid place-items-center text-sm font-bold shrink-0">T</div>
+          <div className={cn("font-semibold whitespace-nowrap", collapsed && "md:hidden")}>
+            Tertiary Training
+          </div>
         </div>
         <nav className="p-3 space-y-1 text-sm">
           {nav.map((item) => {
@@ -89,19 +113,31 @@ export function DashboardShell({
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
+                title={collapsed ? item.label : undefined}
                 className={cn(
-                  "flex items-center gap-2 rounded-lg px-3 py-2 transition-colors",
+                  "flex items-center rounded-lg transition-colors",
+                  collapsed ? "md:justify-center md:px-2 md:py-2 gap-2 px-3 py-2" : "gap-2 px-3 py-2",
                   active
                     ? "bg-indigo-500/15 text-indigo-200"
                     : "text-zinc-300 hover:bg-zinc-800/70 hover:text-zinc-50",
                 )}
               >
-                <span className="text-zinc-400">{item.icon ?? "•"}</span>
-                {item.label}
+                <span className="text-zinc-400 shrink-0">{item.icon ?? "•"}</span>
+                <span className={cn("truncate", collapsed && "md:hidden")}>{item.label}</span>
               </Link>
             );
           })}
         </nav>
+        {/* Desktop-only collapse/expand toggle, pinned to the bottom */}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="hidden md:flex absolute bottom-3 left-0 right-0 mx-3 items-center justify-center gap-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+        >
+          <span className="text-base leading-none">{collapsed ? "›" : "‹"}</span>
+          <span className={cn(collapsed && "md:hidden")}>Collapse</span>
+        </button>
       </aside>
 
       {/* Main */}
