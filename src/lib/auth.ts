@@ -69,6 +69,9 @@ export async function getSessionUser() {
   if (!payload) return null;
   const user = await prisma.user.findUnique({ where: { id: payload.sub } });
   if (!user || user.status !== "ACTIVE") return null;
+  // Trainers never expire; learners (and any user with expiresAt set) do.
+  if (user.role !== "TRAINER" && user.expiresAt && user.expiresAt.getTime() < Date.now())
+    return null;
   return user;
 }
 

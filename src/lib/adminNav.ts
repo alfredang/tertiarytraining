@@ -10,3 +10,16 @@ export const adminNav: NavItem[] = [
   { href: "/admin/how-to", label: "How To", icon: "?" },
   { href: "/admin/settings", label: "Settings", icon: "⚙" },
 ];
+
+// Trainer nav: trainer dashboard + the two admin pages they're allowed into.
+export const trainerNav: NavItem[] = [
+  { href: "/dashboard/trainer", label: "My Environments", icon: "▣" },
+  { href: "/admin/signup-approvals", label: "Signup Approvals", icon: "✓" },
+  { href: "/admin/users", label: "Learners", icon: "👥" },
+];
+
+export function navForRole(role: "ADMIN" | "TRAINER" | "LEARNER"): NavItem[] {
+  if (role === "ADMIN") return adminNav;
+  if (role === "TRAINER") return trainerNav;
+  return [{ href: "/dashboard/learner", label: "My Environments", icon: "▣" }];
+}

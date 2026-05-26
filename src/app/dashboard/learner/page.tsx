@@ -10,25 +10,32 @@ export default async function LearnerDashboard() {
   if (user.role !== "LEARNER" && user.role !== "ADMIN")
     redirect(`/dashboard/${user.role.toLowerCase()}`);
 
-  // Learners see: containers assigned specifically to them + any shared
-  // (unassigned) container that belongs to an enabled environment.
+  // Learners see only containers in environments explicitly assigned to them
+  // (via EnvironmentAssignment) OR containers individually assigned to them.
   // Admins previewing this dashboard see everything.
-  const containers = await prisma.dockerContainer.findMany({
-    where:
-      user.role === "ADMIN"
-        ? {}
-        : {
-            OR: [
-              { assignedUserId: user.id },
-              {
-                assignedUserId: null,
-                environment: { enabled: true },
-              },
-            ],
-          },
-    include: { environment: true },
-    orderBy: [{ environment: { name: "asc" } }, { name: "asc" }],
-  });
+  let containers;
+  if (user.role === "ADMIN") {
+    containers = await prisma.dockerContainer.findMany({
+      include: { environment: true },
+      orderBy: [{ environment: { name: "asc" } }, { name: "asc" }],
+    });
+  } else {
+    const assignments = await prisma.environmentAssignment.findMany({
+      where: { userId: user.id },
+      select: { environmentId: true },
+    });
+    const envIds = assignments.map((a) => a.environmentId);
+    containers = await prisma.dockerContainer.findMany({
+      where: {
+        OR: [
+          { assignedUserId: user.id },
+          { environmentId: { in: envIds }, environment: { enabled: true } },
+        ],
+      },
+      include: { environment: true },
+      orderBy: [{ environment: { name: "asc" } }, { name: "asc" }],
+    });
+  }
 
   return (
     <DashboardShell

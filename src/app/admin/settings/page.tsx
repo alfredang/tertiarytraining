@@ -1,6 +1,7 @@
 import { getSessionUser } from "@/lib/auth";
 import { DashboardShell } from "@/components/DashboardShell";
 import { adminNav } from "@/lib/adminNav";
+import { SettingsForm } from "@/components/SettingsForm";
 
 export default async function Page() {
   const user = (await getSessionUser())!;
@@ -8,6 +9,10 @@ export default async function Page() {
     <DashboardShell user={{ name: user.name, email: user.email, role: user.role }} nav={adminNav}>
       <h1 className="text-2xl font-semibold mb-6">Settings</h1>
       <div className="space-y-6 max-w-2xl">
+        <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+          <h2 className="font-semibold mb-3">Account expiry</h2>
+          <SettingsForm />
+        </section>
         <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
           <h2 className="font-semibold mb-2">System</h2>
           <dl className="grid grid-cols-2 gap-y-2 text-sm">

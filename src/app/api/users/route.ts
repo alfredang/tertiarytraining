@@ -4,18 +4,20 @@ import { requireRole, hashPassword } from "@/lib/auth";
 import { userCreateSchema } from "@/lib/validation";
 
 export async function GET(req: Request) {
-  const { user, error, status } = await requireRole("ADMIN");
+  const { user, error, status } = await requireRole("ADMIN", "TRAINER");
   if (!user) return NextResponse.json({ error }, { status });
   const { searchParams } = new URL(req.url);
   const statusFilter = searchParams.get("status") ?? undefined;
   const role = searchParams.get("role") ?? undefined;
+  // Trainers see only learners.
+  const roleFilter = user.role === "TRAINER" ? "LEARNER" : (role as "LEARNER" | "TRAINER" | "ADMIN" | undefined);
   const users = await prisma.user.findMany({
     where: {
       ...(statusFilter ? { status: statusFilter as "PENDING" | "ACTIVE" | "SUSPENDED" | "REJECTED" } : {}),
-      ...(role ? { role: role as "LEARNER" | "TRAINER" | "ADMIN" } : {}),
+      ...(roleFilter ? { role: roleFilter } : {}),
     },
     orderBy: { createdAt: "desc" },
-    select: { id: true, email: true, name: true, role: true, status: true, createdAt: true },
+    select: { id: true, email: true, name: true, role: true, status: true, expiresAt: true, createdAt: true },
   });
   return NextResponse.json({ users });
 }

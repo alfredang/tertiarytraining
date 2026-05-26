@@ -28,7 +28,8 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(url);
     }
     // Admins can view any dashboard / admin route.
-    // Non-admins are restricted to their own dashboard.
+    // Non-admins are restricted to their own dashboard, with a couple
+    // of admin routes also opened to TRAINERs (approvals + users list).
     if (role !== "ADMIN") {
       if (pathname.startsWith("/dashboard/learner") && role !== "LEARNER") {
         return NextResponse.redirect(new URL(`/dashboard/${role.toLowerCase()}`, req.url));
@@ -39,7 +40,11 @@ export async function middleware(req: NextRequest) {
       if (pathname.startsWith("/dashboard/admin")) {
         return NextResponse.redirect(new URL(`/dashboard/${role.toLowerCase()}`, req.url));
       }
-      if (pathname.startsWith("/admin")) {
+      // Trainer carve-outs for the admin backend
+      const trainerAllowed =
+        role === "TRAINER" &&
+        (pathname.startsWith("/admin/signup-approvals") || pathname.startsWith("/admin/users"));
+      if (pathname.startsWith("/admin") && !trainerAllowed) {
         return NextResponse.redirect(new URL(`/dashboard/${role.toLowerCase()}`, req.url));
       }
     }

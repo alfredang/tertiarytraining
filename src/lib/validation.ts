@@ -47,4 +47,5 @@ export const userUpdateSchema = z.object({
   role: z.enum(["LEARNER", "TRAINER", "ADMIN"]).optional(),
   status: z.enum(["PENDING", "ACTIVE", "SUSPENDED", "REJECTED"]).optional(),
   password: passwordSchema.optional(),
+  expiresAt: z.string().datetime().nullable().optional(),
 });

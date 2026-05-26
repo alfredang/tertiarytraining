@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { signupSchema } from "@/lib/validation";
 import { hashPassword } from "@/lib/auth";
+import { expiryFromNow, getDefaultValidityDays } from "@/lib/settings";
 
 export async function POST(req: Request) {
   const parsed = signupSchema.safeParse(await req.json().catch(() => ({})));
@@ -10,8 +11,16 @@ export async function POST(req: Request) {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return NextResponse.json({ error: "Email already registered" }, { status: 409 });
   const passwordHash = await hashPassword(password);
+  const days = await getDefaultValidityDays();
   await prisma.user.create({
-    data: { email, name, passwordHash, role: "LEARNER", status: "PENDING" },
+    data: {
+      email,
+      name,
+      passwordHash,
+      role: "LEARNER",
+      status: "PENDING",
+      expiresAt: expiryFromNow(days),
+    },
   });
   return NextResponse.json({ ok: true });
 }

@@ -10,8 +10,9 @@ export async function POST(req: Request) {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return NextResponse.json({ error: "Email already registered" }, { status: 409 });
   const passwordHash = await hashPassword(password);
+  // Trainers don't expire — expiresAt stays null.
   await prisma.user.create({
-    data: { email, name, passwordHash, role: "TRAINER", status: "PENDING" },
+    data: { email, name, passwordHash, role: "TRAINER", status: "PENDING", expiresAt: null },
   });
   return NextResponse.json({ ok: true });
 }

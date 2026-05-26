@@ -41,6 +41,7 @@ model User {
   passwordHash  String
   role          Role          @default(LEARNER)
   status        AccountStatus @default(PENDING)
+  expiresAt     DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -102,6 +103,11 @@ model RefreshLog {
   status         String
   message        String?
   createdAt      DateTime     @default(now())
+}
+
+model SystemSetting {
+  key   String @id
+  value String
 }
 
 model AuditLog {

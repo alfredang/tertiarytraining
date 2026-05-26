@@ -20,6 +20,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Your signup was rejected." }, { status: 403 });
   if (user.status === "SUSPENDED")
     return NextResponse.json({ error: "Your account is suspended." }, { status: 403 });
+  if (user.role !== "TRAINER" && user.expiresAt && user.expiresAt.getTime() < Date.now())
+    return NextResponse.json({ error: "Your account has expired. Please ask a trainer or admin to extend it." }, { status: 403 });
 
   const token = await signSession({ sub: user.id, email: user.email, name: user.name, role: user.role });
   await setSessionCookie(token);
