@@ -7,5 +7,6 @@ export const adminNav: NavItem[] = [
   { href: "/admin/environments", label: "Environments", icon: "▣" },
   { href: "/admin/containers", label: "Containers", icon: "⬢" },
   { href: "/admin/refresh-logs", label: "Refresh Logs", icon: "↻" },
+  { href: "/admin/how-to", label: "How To", icon: "?" },
   { href: "/admin/settings", label: "Settings", icon: "⚙" },
 ];
