@@ -11,7 +11,13 @@ type Env = {
   containers: { id: string; status: string; containerUrl: string }[];
 };
 
-export function TrainerEnvList({ envs }: { envs: Env[] }) {
+export function TrainerEnvList({
+  envs,
+  viewerRole = "TRAINER",
+}: {
+  envs: Env[];
+  viewerRole?: "TRAINER" | "ADMIN";
+}) {
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -61,6 +67,7 @@ export function TrainerEnvList({ envs }: { envs: Env[] }) {
             {env.containers.map((c) => (
               <EnvironmentCard
                 key={c.id}
+                viewerRole={viewerRole}
                 env={{
                   id: c.id,
                   name: env.environmentName,

@@ -50,6 +50,7 @@ export default async function LearnerDashboard() {
           {containers.map((c) => (
             <EnvironmentCard
               key={c.id}
+              viewerRole={user.role}
               env={{
                 id: c.id,
                 name: c.environment.name,

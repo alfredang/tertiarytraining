@@ -77,6 +77,7 @@ model DockerContainer {
   assignedUser     User?           @relation("AssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
   status           ContainerStatus @default(STOPPED)
   lastRefreshedAt  DateTime?
+  lastAccessedAt   DateTime?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 }

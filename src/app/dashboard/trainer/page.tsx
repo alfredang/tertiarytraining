@@ -44,7 +44,7 @@ export default async function TrainerDashboard() {
     >
       <h1 className="text-2xl font-semibold mb-1">Trainer Dashboard</h1>
       <p className="text-sm text-zinc-400 mb-6">Refresh all containers for an environment with one click.</p>
-      <TrainerEnvList envs={envs} />
+      <TrainerEnvList envs={envs} viewerRole={user.role === "ADMIN" ? "ADMIN" : "TRAINER"} />
     </DashboardShell>
   );
 }

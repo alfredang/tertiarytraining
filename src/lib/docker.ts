@@ -35,6 +35,10 @@ export type RunOptions = {
 export interface DockerService {
   stopAndRemove(name: string): Promise<void>;
   run(image: string, name: string, port: number, opts?: RunOptions): Promise<RunResult>;
+  /** Start an already-existing stopped container by name. */
+  start(name: string): Promise<void>;
+  /** Stop a running container by name (preserves data; not destructive). */
+  stop(name: string): Promise<void>;
   /** Optional — present in dockerode mode only. Restores the WP DB from a golden snapshot. */
   softResetWp?(info: WpContainerInfo): Promise<RunResult>;
 }
@@ -60,6 +64,12 @@ class MockDockerService implements DockerService {
     console.log(`[docker:mock] soft-reset ${info.wpContainer} from ${info.goldenSqlPath}`);
     return { containerUrl: info.containerUrl };
   }
+  async start(name: string): Promise<void> {
+    console.log(`[docker:mock] start ${name}`);
+  }
+  async stop(name: string): Promise<void> {
+    console.log(`[docker:mock] stop ${name}`);
+  }
 }
 
 // ============================================================================
@@ -75,6 +85,28 @@ class DockerodeService implements DockerService {
       await c.remove({ force: true }).catch(() => {});
     } catch (err) {
       console.warn(`[docker:dockerode] stopAndRemove ${name} failed`, err);
+    }
+  }
+
+  async start(name: string): Promise<void> {
+    const c = this.docker.getContainer(name);
+    try {
+      await c.start();
+    } catch (err) {
+      const e = err as { statusCode?: number };
+      // 304 = already started; treat as success
+      if (e.statusCode !== 304) throw err;
+    }
+  }
+
+  async stop(name: string): Promise<void> {
+    const c = this.docker.getContainer(name);
+    try {
+      await c.stop({ t: 10 });
+    } catch (err) {
+      const e = err as { statusCode?: number };
+      // 304 = already stopped; treat as success
+      if (e.statusCode !== 304) throw err;
     }
   }
 
@@ -216,4 +248,33 @@ export function wpSoftResetTarget(args: {
     goldenSqlPath: `/opt/tertiarytraining/wp-golden/demo-${n}.sql`,
     containerUrl: args.containerUrl,
   };
+}
+
+/**
+ * Return the list of *host* docker container names that need to be
+ * started/stopped together for a given DockerContainer row.
+ *
+ * - WordPress: wp + db pair
+ * - Ubuntu / Kali Linux: single container matching the display name pattern
+ */
+export function hostContainerNamesFor(args: {
+  environmentName: string;
+  port: number;
+}): string[] {
+  if (args.environmentName === "WordPress") {
+    const n = args.port - 8080;
+    if (n < 1 || n > 5) return [];
+    return [`wordpress-demo${n}-wordpress-1`, `wordpress-demo${n}-db-1`];
+  }
+  if (args.environmentName === "Ubuntu") {
+    const n = args.port - 8090;
+    if (n < 1 || n > 5) return [];
+    return [`ubuntu-demo${n}`];
+  }
+  if (args.environmentName === "Kali Linux") {
+    const n = args.port - 8095;
+    if (n < 1 || n > 5) return [];
+    return [`kali-demo${n}`];
+  }
+  return [];
 }
