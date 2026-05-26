@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useState, useTransition } from "react";
+import { ReactNode, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type NavItem = { href: string; label: string; icon?: string };
 
 function ViewAsSwitcher({ pathname }: { pathname: string }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
   const current =
     pathname.startsWith("/dashboard/learner") ? "LEARNER" :
     pathname.startsWith("/dashboard/trainer") ? "TRAINER" :
@@ -22,13 +20,11 @@ function ViewAsSwitcher({ pathname }: { pathname: string }) {
   ];
 
   function switchTo(role: "ADMIN" | "TRAINER" | "LEARNER", href: string) {
-    // Persist the view-as choice so other pages (How To, etc.) render
-    // the matching nav too, not just /dashboard/{role}.
+    // Set the cookie and do a full reload to the destination. This avoids
+    // Next.js's client router cache serving a stale prefetched version of
+    // pages (e.g. /how-to) that was prefetched before the cookie existed.
     document.cookie = `tt_viewas=${role}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
-    startTransition(() => {
-      router.push(href);
-      router.refresh();
-    });
+    window.location.href = href;
   }
 
   return (
@@ -39,7 +35,6 @@ function ViewAsSwitcher({ pathname }: { pathname: string }) {
           key={t.role}
           type="button"
           onClick={() => switchTo(t.role, t.href)}
-          disabled={pending}
           className={cn(
             "px-3 py-1 rounded-md transition-colors",
             current === t.role
