@@ -99,12 +99,19 @@ class DockerodeService implements DockerService {
   async softResetWp(info: WpContainerInfo): Promise<RunResult> {
     const dbContainer = this.docker.getContainer(info.dbContainer);
 
-    // Grab the MariaDB root password from the DB container's env
+    // Discover credentials + DB name from the DB container's env.
+    // Try MARIADB_* first (modern MariaDB images), fall back to MYSQL_*.
     const inspect = await dbContainer.inspect();
     const env = inspect.Config?.Env ?? [];
-    const rootPwLine = env.find((e: string) => e.startsWith("MYSQL_ROOT_PASSWORD="));
-    if (!rootPwLine) throw new Error(`MYSQL_ROOT_PASSWORD not set on ${info.dbContainer}`);
-    const rootPw = rootPwLine.split("=", 2)[1];
+    const envMap: Record<string, string> = {};
+    for (const e of env) {
+      const idx = e.indexOf("=");
+      if (idx > 0) envMap[e.slice(0, idx)] = e.slice(idx + 1);
+    }
+    const rootPw = envMap.MARIADB_ROOT_PASSWORD ?? envMap.MYSQL_ROOT_PASSWORD;
+    if (!rootPw)
+      throw new Error(`No root password env var on ${info.dbContainer} (tried MARIADB_ROOT_PASSWORD, MYSQL_ROOT_PASSWORD)`);
+    const dbName = envMap.MARIADB_DATABASE ?? envMap.MYSQL_DATABASE ?? "wordpress";
 
     // The golden SQL file is bind-mounted into THIS app container at info.goldenSqlPath.
     // We need it accessible inside the DB container. Two ways:
@@ -122,13 +129,13 @@ class DockerodeService implements DockerService {
     const tarBuf = Buffer.concat(chunks);
     await dbContainer.putArchive(tarBuf, { path: "/tmp" });
 
-    // Drop & recreate the wordpress DB, then restore from /tmp/restore.sql
+    // Drop & recreate the per-demo DB, then restore from /tmp/restore.sql
     const exec = await dbContainer.exec({
       Cmd: [
         "sh",
         "-c",
-        `mariadb -u root -p"${rootPw}" -e "DROP DATABASE IF EXISTS wordpress; CREATE DATABASE wordpress;" && ` +
-          `mariadb -u root -p"${rootPw}" wordpress < /tmp/restore.sql && rm -f /tmp/restore.sql`,
+        `mariadb -u root -p"${rootPw}" -e "DROP DATABASE IF EXISTS \\\`${dbName}\\\`; CREATE DATABASE \\\`${dbName}\\\`;" && ` +
+          `mariadb -u root -p"${rootPw}" "${dbName}" < /tmp/restore.sql && rm -f /tmp/restore.sql`,
       ],
       AttachStdout: true,
       AttachStderr: true,
