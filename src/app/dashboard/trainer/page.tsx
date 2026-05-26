@@ -10,15 +10,31 @@ export default async function TrainerDashboard() {
   if (user.role !== "TRAINER" && user.role !== "ADMIN")
     redirect(`/dashboard/${user.role.toLowerCase()}`);
 
-  // Admins previewing the trainer dashboard see every environment.
-  const assignments = user.role === "ADMIN"
-    ? (await prisma.environment.findMany({
-        include: { containers: true },
-      })).map((env) => ({ environment: env }))
-    : await prisma.environmentAssignment.findMany({
-        where: { userId: user.id },
-        include: { environment: { include: { containers: true } } },
-      });
+  // Trainers (and admins previewing) see every enabled environment by
+  // default. If a trainer has explicit assignments, those still take
+  // precedence and are deduped.
+  const explicit = await prisma.environmentAssignment.findMany({
+    where: { userId: user.id },
+    include: { environment: { include: { containers: true } } },
+  });
+  const allEnabled = await prisma.environment.findMany({
+    where: { enabled: true },
+    include: { containers: true },
+  });
+  const seen = new Set<string>();
+  const assignments: { environment: (typeof allEnabled)[number] }[] = [];
+  for (const a of explicit) {
+    if (a.environment.enabled && !seen.has(a.environment.id)) {
+      assignments.push({ environment: a.environment });
+      seen.add(a.environment.id);
+    }
+  }
+  for (const env of allEnabled) {
+    if (!seen.has(env.id)) {
+      assignments.push({ environment: env });
+      seen.add(env.id);
+    }
+  }
 
   const envs = assignments.map((a) => ({
     environmentId: a.environment.id,

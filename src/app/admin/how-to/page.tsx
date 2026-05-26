@@ -11,6 +11,13 @@ const guides = [
       "Wire up a GitHub webhook so every push to main auto-deploys via Coolify. Step-by-step with screenshots.",
     icon: "⚙",
   },
+  {
+    href: "/admin/how-to/wordpress-environment",
+    title: "WordPress Environment",
+    description:
+      "How to log into the WordPress backend admin and how to refresh containers when learners break them.",
+    icon: "⌬",
+  },
 ];
 
 export default async function Page() {

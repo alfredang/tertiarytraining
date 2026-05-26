@@ -28,11 +28,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "environmentId is required" }, { status: 400 });
 
   if (user.role === "TRAINER") {
-    const assigned = await prisma.environmentAssignment.findFirst({
-      where: { environmentId, userId: user.id },
-    });
-    if (!assigned)
-      return NextResponse.json({ error: "Forbidden — environment not assigned to you" }, { status: 403 });
+    // Trainers may refresh any enabled environment, or any environment
+    // explicitly assigned to them.
+    const env = await prisma.environment.findUnique({ where: { id: environmentId } });
+    if (!env) return NextResponse.json({ error: "Environment not found" }, { status: 404 });
+    if (!env.enabled) {
+      const assigned = await prisma.environmentAssignment.findFirst({
+        where: { environmentId, userId: user.id },
+      });
+      if (!assigned)
+        return NextResponse.json({ error: "Forbidden — environment not assigned to you" }, { status: 403 });
+    }
   }
 
   const result = await refreshByEnvironment(environmentId, user.id);

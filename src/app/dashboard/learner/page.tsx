@@ -10,11 +10,24 @@ export default async function LearnerDashboard() {
   if (user.role !== "LEARNER" && user.role !== "ADMIN")
     redirect(`/dashboard/${user.role.toLowerCase()}`);
 
-  // Admins viewing the learner dashboard see all containers as a preview.
+  // Learners see: containers assigned specifically to them + any shared
+  // (unassigned) container that belongs to an enabled environment.
+  // Admins previewing this dashboard see everything.
   const containers = await prisma.dockerContainer.findMany({
-    where: user.role === "ADMIN" ? {} : { assignedUserId: user.id },
+    where:
+      user.role === "ADMIN"
+        ? {}
+        : {
+            OR: [
+              { assignedUserId: user.id },
+              {
+                assignedUserId: null,
+                environment: { enabled: true },
+              },
+            ],
+          },
     include: { environment: true },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ environment: { name: "asc" } }, { name: "asc" }],
   });
 
   return (
