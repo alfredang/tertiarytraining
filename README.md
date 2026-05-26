@@ -1,148 +1,227 @@
+<div align="center">
+
 # Tertiary Training
 
-Training Environment Management for Docker-based labs (WordPress, Ubuntu, Linux Desktop, Web Dev, Cybersecurity, …) with role-based access for **Learners**, **Trainers**, and **Admins**.
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js&logoColor=white)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)
+[![PostgreSQL](https://img.shields.io/badge/Postgres-16-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com)
+[![Coolify](https://img.shields.io/badge/Deployed-Coolify-8A2BE2)](https://coolify.io)
 
-Built with **Next.js 16**, **TypeScript**, **Tailwind CSS**, **Prisma**, and **PostgreSQL**. Designed to deploy on **Coolify** as two resources (App + Postgres).
+**Browser-based training environment management for Docker labs (WordPress, Ubuntu desktop, Kali Linux) — with role-based access, OAuth sign-in, on-demand container start/stop, and automatic idle shutdown.**
 
----
+[Live Site](https://www.tertiarytraining.com) · [Report Bug](https://github.com/alfredang/tertiarytraining/issues) · [Request Feature](https://github.com/alfredang/tertiarytraining/issues)
 
-## Features
+</div>
 
-- Modern, dark, mobile-responsive dashboard UI
-- Email + password login (OTP and social login slots in UI; stubs ready for an OAuth/OTP provider)
-- Separate **Learner** and **Trainer** signup flows
-- Admin **approval workflow** — accounts start as `PENDING` and cannot log in until approved
-- Three role-based dashboards:
-  - **Learner** — view assigned environment cards and click through to the container URL
-  - **Trainer** — view assigned environments + one-click "Refresh all" per environment
-  - **Admin** — full CRUD over users, environments, and containers + refresh logs
-- Refresh orchestration: stop → remove → recreate → update URL → log
-- Pluggable Docker driver (`mock` by default, `dockerode` integration path documented)
-- Audit and refresh logs persisted in Postgres
+## Screenshot
 
----
+![Screenshot](screenshot.png)
 
-## Local development
+## About
+
+**Tertiary Training** is a web platform that lets training centers spin up isolated, browser-accessible Docker lab environments for learners — without anyone needing SSH, local Docker, or a VM. Trainers and admins activate containers on demand; learners click a card and land in a working WordPress site, Ubuntu XFCE desktop, or Kali Linux desktop, all in a browser tab. Containers auto-shutdown after 2 hours of inactivity so a small VPS can serve many concurrent classes.
+
+### Key features
+
+| Area | What you get |
+|---|---|
+| **Three lab environments** | WordPress (5 demos), Ubuntu XFCE desktop (5 demos), Kali Linux desktop (5 demos) — all accessed via a real Let's Encrypt-secured `/lab/<env>-N/` reverse-proxy path |
+| **Role-based access** | Learner / Trainer / Admin with explicit environment assignments. Admins have a "View as" topbar switcher to preview any role. |
+| **Approval workflow** | New email/OAuth signups land in `PENDING`; admins and trainers approve/reject. Learner accounts have a configurable expiry window. |
+| **OAuth + email login** | Sign in with Google or GitHub (credentials stored in admin Settings, no redeploy needed). Email/password still supported. |
+| **On-demand containers** | Default state is STOPPED — zero idle RAM. Admin/trainer clicks Start → container boots in ~25s → access URL opens. Auto-stop after 2h. |
+| **WordPress soft-reset** | Refresh a WP demo and the DB is restored from a "golden" SQL snapshot in ~1 second — admin credentials and sample content preserved, learner edits wiped. |
+| **Daily disk hygiene** | A systemd timer prunes Docker image cache and build cache nightly without touching stopped containers or in-use volumes. |
+| **Self-healing nginx** | The host nginx upstream IP auto-syncs after every Coolify rebuild via a 30-second timer — no manual `nginx -s reload` after deploys. |
+| **In-app How-To guides** | Operator runbooks (Coolify CI/CD setup, WordPress admin login, refresh containers, enable Real Docker mode) live at `/how-to/*` and are visible to all roles. |
+
+## Tech Stack
+
+| Layer | Tools |
+|---|---|
+| **Frontend** | Next.js 16 (App Router), React 19, Tailwind CSS 3.4, TypeScript 5.7 |
+| **Backend** | Next.js API routes, JWT sessions via `jose`, bcryptjs password hashing |
+| **Database** | PostgreSQL 16, Prisma 5 ORM |
+| **OAuth** | `arctic` (lightweight OAuth 2.0 + PKCE), Google + GitHub providers |
+| **Docker control** | `dockerode` talks to `/var/run/docker.sock`; mock driver for local dev |
+| **Lab containers** | `wordpress:latest` + `mariadb:11`, `lscr.io/linuxserver/webtop:ubuntu-xfce`, `lscr.io/linuxserver/kali-linux:latest` |
+| **Hosting** | Coolify on a Hostinger VPS; host nginx + Let's Encrypt cert reverse-proxies everything |
+
+## Architecture
+
+```
+                                Internet (HTTPS, Let's Encrypt cert)
+                                                 │
+                                                 ▼
+        ┌──────────────────────────  host nginx :443  ──────────────────────────┐
+        │                                                                       │
+        │   /                       /lab/ubuntu-N/         /lab/kali-N/         │
+        │   ↓                       ↓                      ↓                    │
+        │   Coolify app container   127.0.0.1:809{1..5}    127.0.0.1:809{6..0}  │
+        │   (Next.js + Prisma)      ubuntu-demoN (XFCE)    kali-demoN (Kali)    │
+        │   ↓                                                                   │
+        │   /var/run/docker.sock ←── dockerode controls all containers          │
+        │   ↓                                                                   │
+        │   Postgres (Coolify resource) — users, environments, container state  │
+        │                                                                       │
+        │   Also on host: 5 × (wordpress-demoN + db), n8n stack (untouched)    │
+        └───────────────────────────────────────────────────────────────────────┘
+
+                          systemd timers running on the host:
+                          • tt-nginx-sync       (every 30s — fix upstream IP)
+                          • tt-cleanup-idle     (every 5min — auto-stop idle)
+                          • tt-docker-prune     (daily 03:00 — disk hygiene)
+```
+
+## Project Structure
+
+```
+tertiarytraining/
+├── prisma/
+│   ├── schema.prisma                  # User, Environment, DockerContainer, Assignment, RefreshLog, SystemSetting
+│   └── migrations/                    # incremental migrations
+├── src/
+│   ├── app/
+│   │   ├── login/                     # email + OAuth login with signup popup
+│   │   ├── dashboard/{learner,trainer,admin}/
+│   │   ├── admin/                     # users, envs, containers, refresh-logs, settings
+│   │   ├── how-to/                    # operator runbooks
+│   │   └── api/
+│   │       ├── auth/                  # login, signup, OAuth start/callback (google + github)
+│   │       ├── containers/[id]/       # start, stop, access, refresh
+│   │       ├── admin/                 # approve, extend, settings, cleanup-idle
+│   │       └── users/                 # CRUD + per-user env assignments
+│   ├── components/                    # DashboardShell, EnvironmentCard, SettingsForm, …
+│   └── lib/
+│       ├── auth.ts                    # JWT session helpers
+│       ├── docker.ts                  # DockerService (mock + dockerode) + WP soft-reset
+│       ├── refresh.ts                 # refresh orchestration
+│       ├── oauth.ts                   # arctic-based providers
+│       └── settings.ts                # SystemSetting CRUD + OAuth cred storage
+├── scripts/
+│   ├── tt-ubuntu-bootstrap.sh         # provisions 5 webtop:ubuntu-xfce containers
+│   ├── tt-kali-bootstrap.sh           # provisions 5 kali-linux containers
+│   ├── tt-nginx-labs-apply.sh         # writes the lab proxy nginx vhost
+│   └── tt-wp-bootstrap.sh             # captures WordPress golden SQL snapshots
+├── Dockerfile                          # multi-stage Next.js standalone build
+└── docker-compose.yml                  # local dev stack (Postgres + app)
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 20+
+- Docker + Docker Compose (for local Postgres)
+- An OAuth client at Google Cloud Console and/or GitHub (optional — email login works without)
+
+### Local development
 
 ```bash
-cp .env.example .env
-# Edit .env: at minimum set DATABASE_URL, JWT_SECRET, SEED_TOKEN
+git clone https://github.com/alfredang/tertiarytraining.git
+cd tertiarytraining
 
+cp .env.example .env
+# Edit .env: set JWT_SECRET (`openssl rand -hex 32`) and SEED_TOKEN
+
+# Start a local Postgres
+docker run -d --name tertiary-db \
+  -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=tertiary_training \
+  -p 5433:5432 postgres:16-alpine
+
+# Install deps, run migrations, start the dev server
 npm install
-npx prisma migrate dev --name init
-npx prisma db seed     # creates admin@tertiary.local / ChangeMe123! + sample environments
+npx prisma migrate dev
+npx tsx scripts/seed-admins.ts          # creates 2 sample admin accounts
+npx tsx scripts/seed-local-containers.ts # mirrors production env + container layout
 npm run dev
 ```
 
-Open <http://localhost:3000> and sign in.
+Open [http://localhost:3000](http://localhost:3000), sign in with the seeded admin (`admin@tertiary.local` / `ChangeMe123!` — change immediately).
 
-### With Docker Compose
+## Deployment
+
+### Coolify (recommended)
+
+The production deployment is on Coolify. Two resources:
+
+| Resource | What |
+|---|---|
+| **Database** | Coolify-managed PostgreSQL 16 |
+| **Application** | This repo, Build Pack: `Dockerfile`, Port: `3000` |
+
+Environment variables on the Application resource:
+
+```env
+DATABASE_URL=postgres://…@…/postgres?schema=public
+JWT_SECRET=<openssl rand -hex 32>
+SEED_TOKEN=<openssl rand -hex 32>
+DOCKER_HOST_MODE=dockerode              # or "mock"
+PUBLIC_BASE_URL=https://www.tertiarytraining.com
+NEXT_PUBLIC_APP_NAME=Tertiary Training
+```
+
+Custom Docker options (required for `dockerode` mode and lab restoration):
+
+```
+--volume /var/run/docker.sock:/var/run/docker.sock
+--volume /opt/tertiarytraining/wp-golden:/opt/tertiarytraining/wp-golden:ro
+```
+
+Each branch push to `main` auto-deploys via a Coolify GitHub webhook. See [`/how-to/setup-coolify-cicd`](https://www.tertiarytraining.com/how-to/setup-coolify-cicd) for the wiring.
+
+### Lab containers on the host
+
+After the app is up, SSH to the host and run the bootstrap scripts once:
+
+```bash
+sudo /usr/local/bin/tt-ubuntu-bootstrap.sh   # 5 Ubuntu XFCE desktops on 8091..8095
+sudo /usr/local/bin/tt-kali-bootstrap.sh     # 5 Kali Linux desktops on 8096..8100
+sudo /usr/local/bin/tt-wp-bootstrap.sh       # captures WP golden DB snapshots
+sudo /usr/local/bin/tt-nginx-labs-apply.sh   # adds the /lab/* proxy locations to nginx
+```
+
+Full setup walk-through inside the app at [`/how-to/enable-real-docker`](https://www.tertiarytraining.com/how-to/enable-real-docker).
+
+### Docker Compose (local end-to-end stack)
 
 ```bash
 JWT_SECRET=$(openssl rand -hex 32) docker compose up --build
 ```
 
-Then bootstrap the first admin:
+## Contributing
 
-```bash
-curl -X POST http://localhost:3000/api/admin/seed \
-  -H "x-seed-token: change-me-seed" \
-  -H "content-type: application/json" \
-  -d '{"email":"admin@tertiary.local","password":"ChangeMe123!","name":"Administrator"}'
-```
+1. Fork the repo
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Make changes; the codebase ships with a TypeScript-checked build (`npm run build`) which is what production runs
+4. Commit: `git commit -m "feat: describe change"`
+5. Push: `git push origin feature/your-feature`
+6. Open a Pull Request
 
----
+Issues, ideas, and discussions: [GitHub Issues](https://github.com/alfredang/tertiarytraining/issues).
 
-## Coolify deployment (Host 1)
+## Developed By
 
-The system runs as **two Coolify resources**:
+[**Tertiary Infotech Academy Pte. Ltd.**](https://www.tertiarycourses.com.sg) — training centre in Singapore. This codebase powers internal labs for hands-on classes (WordPress, Linux, security training).
 
-### 1. Database resource — PostgreSQL
+## Acknowledgements
 
-1. In Coolify, **+ New Resource → Database → PostgreSQL** on **Host 1**.
-2. Set a strong password. Note the connection string Coolify generates, e.g.
-   `postgresql://postgres:<password>@<service-host>:5432/postgres`.
-3. Save and start.
-
-### 2. App resource — Next.js (Dockerfile)
-
-1. **+ New Resource → Application** on **Host 1**.
-2. Source: this Git repository.
-3. Build pack: **Dockerfile** (uses the `Dockerfile` at repo root).
-4. Port: `3000`.
-5. Environment variables:
-   ```
-   DATABASE_URL=postgresql://postgres:<password>@<db-service-host>:5432/postgres
-   JWT_SECRET=<long-random-hex>
-   SEED_TOKEN=<long-random-hex>
-   DOCKER_HOST_MODE=mock
-   PUBLIC_BASE_URL=https://<your-coolify-domain>
-   NEXT_PUBLIC_APP_NAME=Tertiary Training
-   ```
-6. Deploy. Prisma migrations run automatically on container start (`prisma migrate deploy`).
-7. Bootstrap the first admin once the app is live:
-   ```bash
-   curl -X POST https://<your-coolify-domain>/api/admin/seed \
-     -H "x-seed-token: $SEED_TOKEN" \
-     -H "content-type: application/json" \
-     -d '{"email":"admin@yourdomain.com","password":"<StrongPassword>","name":"Administrator"}'
-   ```
-
-### Real Docker integration (optional)
-
-To make the **Refresh** flow actually control Docker containers on the host:
-
-1. `npm i dockerode @types/dockerode`
-2. Uncomment the `DockerodeService` block in [`src/lib/docker.ts`](src/lib/docker.ts).
-3. In Coolify, mount the host Docker socket into the App container:
-   `Volumes` → `/var/run/docker.sock:/var/run/docker.sock`.
-4. Set `DOCKER_HOST_MODE=dockerode`.
-5. Re-deploy.
-
-Until then, refresh uses a mock that simulates the lifecycle and regenerates URLs — useful for UX testing without touching the daemon.
+- [Next.js](https://nextjs.org/) for the App Router framework
+- [Prisma](https://www.prisma.io/) for the type-safe ORM
+- [Coolify](https://coolify.io/) for the self-hosted PaaS
+- [linuxserver.io](https://www.linuxserver.io/) for the `webtop` and `kali-linux` desktop images
+- [arctic](https://arcticjs.dev/) for the lightweight OAuth helpers
+- [tsl0922/ttyd](https://github.com/tsl0922/ttyd) — research for early terminal-only Ubuntu lab
+- [WP-CLI](https://wp-cli.org/) for the WordPress install + golden-snapshot tooling
 
 ---
 
-## Project structure
+<div align="center">
 
-```
-prisma/              Prisma schema + seed
-src/app/             App Router pages + API routes
-src/components/      UI primitives (Shell, Modal, Toast, tables, …)
-src/lib/             prisma client, auth, docker driver, validation, refresh logic
-src/middleware.ts    Route guards by role
-Dockerfile           Multi-stage build (standalone Next output)
-docker-compose.yml   Local stack (Postgres + app)
-.env.example         All required env vars
-```
+If this project saved you setup time, **⭐ star the repo** — it helps others discover it.
 
-## API surface
-
-| Method | Path                                                  | Auth        |
-| ------ | ----------------------------------------------------- | ----------- |
-| POST   | `/api/auth/login`                                     | public      |
-| POST   | `/api/auth/logout`                                    | session     |
-| GET    | `/api/auth/me`                                        | session     |
-| POST   | `/api/auth/signup/learner`                            | public      |
-| POST   | `/api/auth/signup/trainer`                            | public      |
-| GET    | `/api/environments`                                   | any role    |
-| POST   | `/api/environments`                                   | admin       |
-| PUT    | `/api/environments/:id`                               | admin       |
-| DELETE | `/api/environments/:id`                               | admin       |
-| GET    | `/api/containers`                                     | any role    |
-| POST   | `/api/containers`                                     | admin       |
-| PUT    | `/api/containers/:id`                                 | admin       |
-| DELETE | `/api/containers/:id`                                 | admin       |
-| POST   | `/api/containers/:id/refresh`                         | admin/trainer |
-| POST   | `/api/containers/refresh-by-environment`              | admin/trainer |
-| GET    | `/api/users`                                          | admin       |
-| POST   | `/api/users`                                          | admin       |
-| PUT    | `/api/users/:id`                                      | admin       |
-| DELETE | `/api/users/:id`                                      | admin       |
-| POST   | `/api/admin/approve-user`                             | admin       |
-| POST   | `/api/admin/reject-user`                              | admin       |
-| POST   | `/api/admin/seed`                                     | seed-token  |
-
----
-
-Powered by [Tertiary Infotech Academy Pte Ltd](https://www.tertiarycourses.com.sg).
+</div>
