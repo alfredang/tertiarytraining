@@ -12,6 +12,10 @@ RUN apk add --no-cache libc6-compat openssl
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
+# Give Node enough heap for next build + TypeScript checker. Default on
+# small VPS build containers is ~512 MB which is too tight, causing TSC
+# to be OOM-killed mid-check.
+ENV NODE_OPTIONS=--max-old-space-size=2048
 RUN npm run build
 
 FROM node:20-alpine AS runner
