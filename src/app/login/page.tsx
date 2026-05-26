@@ -9,11 +9,12 @@ import { Modal } from "@/components/Modal";
 
 const OAUTH_ERROR_LABELS: Record<string, string> = {
   google_not_configured: "Google sign-in is not configured. Ask an admin.",
+  github_not_configured: "GitHub sign-in is not configured. Ask an admin.",
   state_mismatch: "OAuth state mismatch. Please try again.",
   missing_state: "OAuth session expired. Please try again.",
-  token_exchange_failed: "Google rejected the authorization. Please try again.",
-  userinfo_failed: "Could not read your Google profile. Please try again.",
-  email_not_verified: "Your Google account email is not verified.",
+  token_exchange_failed: "The provider rejected the authorization. Please try again.",
+  userinfo_failed: "Could not read your profile from the provider. Please try again.",
+  email_not_verified: "Your provider account has no verified email.",
   account_rejected: "Your account was rejected.",
   account_suspended: "Your account is suspended.",
   account_expired: "Your account has expired. Ask a trainer or admin to extend it.",
@@ -177,16 +178,12 @@ export default function LoginPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <a className="btn btn-ghost" href="/api/auth/oauth/google">
+              <a className="btn btn-ghost text-center" href="/api/auth/oauth/google">
                 Continue with Google
               </a>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => toast.push("info", "GitHub sign-in: configure Client ID + Secret in Admin → Settings to enable.")}
-              >
+              <a className="btn btn-ghost text-center" href="/api/auth/oauth/github">
                 Continue with GitHub
-              </button>
+              </a>
             </div>
 
             <div className="mt-6 text-center text-sm text-zinc-400">
@@ -280,13 +277,9 @@ export default function LoginPage() {
               <a className="btn btn-ghost text-center" href="/api/auth/oauth/google">
                 Sign up with Google
               </a>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => toast.push("info", "GitHub sign-up: configure Client ID + Secret in Admin → Settings to enable.")}
-              >
+              <a className="btn btn-ghost text-center" href="/api/auth/oauth/github">
                 Sign up with GitHub
-              </button>
+              </a>
             </div>
 
             <p className="text-xs text-zinc-500">
