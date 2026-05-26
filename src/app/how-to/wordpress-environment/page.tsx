@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
+import { getEffectiveRole } from "@/lib/effectiveRole";
 import { DashboardShell } from "@/components/DashboardShell";
 import { navForRole } from "@/lib/adminNav";
 
@@ -21,7 +22,7 @@ export default async function Page() {
   return (
     <DashboardShell
       user={{ name: user.name, email: user.email, role: user.role }}
-      nav={navForRole(user.role)}
+      nav={navForRole(await getEffectiveRole(user.role))}
     >
       <div className="max-w-3xl">
         <nav className="text-xs text-zinc-500 mb-4">

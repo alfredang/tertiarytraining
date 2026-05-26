@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
+import { getEffectiveRole } from "@/lib/effectiveRole";
 import { DashboardShell } from "@/components/DashboardShell";
 import { navForRole } from "@/lib/adminNav";
 
@@ -31,10 +32,11 @@ const guides = [
 export default async function Page() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+  const effectiveRole = await getEffectiveRole(user.role);
   return (
     <DashboardShell
       user={{ name: user.name, email: user.email, role: user.role }}
-      nav={navForRole(user.role)}
+      nav={navForRole(effectiveRole)}
     >
       <h1 className="text-2xl font-semibold mb-1">How To Guides</h1>
       <p className="text-sm text-zinc-400 mb-6">

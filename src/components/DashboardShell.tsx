@@ -21,7 +21,10 @@ function ViewAsSwitcher({ pathname }: { pathname: string }) {
     { role: "LEARNER" as const, href: "/dashboard/learner", label: "Learner" },
   ];
 
-  function switchTo(href: string) {
+  function switchTo(role: "ADMIN" | "TRAINER" | "LEARNER", href: string) {
+    // Persist the view-as choice so other pages (How To, etc.) render
+    // the matching nav too, not just /dashboard/{role}.
+    document.cookie = `tt_viewas=${role}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
     startTransition(() => {
       router.push(href);
       router.refresh();
@@ -35,7 +38,7 @@ function ViewAsSwitcher({ pathname }: { pathname: string }) {
         <button
           key={t.role}
           type="button"
-          onClick={() => switchTo(t.href)}
+          onClick={() => switchTo(t.role, t.href)}
           disabled={pending}
           className={cn(
             "px-3 py-1 rounded-md transition-colors",
