@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { DashboardShell } from "@/components/DashboardShell";
+import { navForRole } from "@/lib/adminNav";
 import { EnvironmentCard } from "@/components/EnvironmentCard";
 
 export default async function LearnerDashboard() {
@@ -36,7 +37,7 @@ export default async function LearnerDashboard() {
   return (
     <DashboardShell
       user={{ name: user.name, email: user.email, role: user.role }}
-      nav={[{ href: "/dashboard/learner", label: "My Environments", icon: "▣" }]}
+      nav={navForRole(user.role === "ADMIN" ? "LEARNER" : user.role)}
     >
       <h1 className="text-2xl font-semibold mb-1">My Training Environments</h1>
       <p className="text-sm text-zinc-400 mb-6">Click Access to open the assigned environment in a new tab.</p>

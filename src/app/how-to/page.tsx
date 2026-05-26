@@ -1,18 +1,19 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { DashboardShell } from "@/components/DashboardShell";
-import { adminNav } from "@/lib/adminNav";
+import { navForRole } from "@/lib/adminNav";
 
 const guides = [
   {
-    href: "/admin/how-to/setup-coolify-cicd",
+    href: "/how-to/setup-coolify-cicd",
     title: "Setup Coolify CI/CD",
     description:
       "Wire up a GitHub webhook so every push to main auto-deploys via Coolify. Step-by-step with screenshots.",
     icon: "⚙",
   },
   {
-    href: "/admin/how-to/wordpress-environment",
+    href: "/how-to/wordpress-environment",
     title: "WordPress Environment",
     description:
       "How to log into the WordPress backend admin and how to refresh containers when learners break them.",
@@ -21,11 +22,12 @@ const guides = [
 ];
 
 export default async function Page() {
-  const user = (await getSessionUser())!;
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
   return (
     <DashboardShell
       user={{ name: user.name, email: user.email, role: user.role }}
-      nav={adminNav}
+      nav={navForRole(user.role)}
     >
       <h1 className="text-2xl font-semibold mb-1">How To Guides</h1>
       <p className="text-sm text-zinc-400 mb-6">

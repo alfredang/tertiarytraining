@@ -1,7 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { DashboardShell } from "@/components/DashboardShell";
-import { adminNav } from "@/lib/adminNav";
+import { navForRole } from "@/lib/adminNav";
+
+const WP_USER = "tertiarytraining";
+const WP_PASS = "Tertiary12345";
 
 const demos = [
   { name: "WP Demo 1", url: "http://168.231.119.201:8081/" },
@@ -12,15 +16,16 @@ const demos = [
 ];
 
 export default async function Page() {
-  const user = (await getSessionUser())!;
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
   return (
     <DashboardShell
       user={{ name: user.name, email: user.email, role: user.role }}
-      nav={adminNav}
+      nav={navForRole(user.role)}
     >
       <div className="max-w-3xl">
         <nav className="text-xs text-zinc-500 mb-4">
-          <Link href="/admin/how-to" className="hover:text-zinc-300">
+          <Link href="/how-to" className="hover:text-zinc-300">
             How To
           </Link>{" "}
           / WordPress Environment
@@ -81,72 +86,46 @@ export default async function Page() {
 
           {/* ---- Access backend admin ---- */}
           <Section title="How to access the WordPress backend admin">
-            <ol className="list-decimal pl-5 space-y-2">
-              <li>
-                Open any WP Demo URL — for example{" "}
-                <code>http://168.231.119.201:8081/</code>.
-              </li>
-              <li>
-                Append <code>/wp-admin</code> to the URL — i.e.{" "}
-                <code>http://168.231.119.201:8081/wp-admin</code>.
-              </li>
-              <li>
-                On the first visit per fresh container, WordPress runs through
-                its 2-minute install wizard:
-                <ul className="list-disc pl-5 mt-1 space-y-0.5 text-zinc-400">
-                  <li>Pick a language</li>
-                  <li>
-                    Set <strong>Site title</strong> (anything, e.g.{" "}
-                    <em>WP Demo 1</em>)
-                  </li>
-                  <li>
-                    Set the <strong>Admin username</strong> (e.g.{" "}
-                    <code>admin</code>)
-                  </li>
-                  <li>
-                    Set a strong <strong>Admin password</strong>{" "}
-                    <span className="text-zinc-500">
-                      (or use the auto-generated one)
-                    </span>
-                  </li>
-                  <li>
-                    Set the <strong>Admin email</strong>
-                  </li>
-                  <li>
-                    Click <strong>Install WordPress</strong>
-                  </li>
-                </ul>
-              </li>
-              <li>
-                After install, log in at{" "}
-                <code>http://168.231.119.201:&lt;port&gt;/wp-admin</code> with
-                the credentials you just set.
-              </li>
-            </ol>
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200/90">
-              ⚠️ Each container has its own database — credentials are{" "}
-              <strong>not shared</strong> between demos. If you re-install
-              WordPress on Demo 1, Demos 2–5 keep their existing config.
-            </div>
             <p>
-              Direct shortcut links (skip the install wizard if it's already
-              done):
+              All 5 demo containers are pre-configured with the{" "}
+              <strong>same admin credentials</strong>:
             </p>
+            <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-4 text-sm space-y-1.5">
+              <div className="flex items-baseline gap-2">
+                <span className="text-zinc-400 min-w-[100px]">Username</span>
+                <code className="text-zinc-100">{WP_USER}</code>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-zinc-400 min-w-[100px]">Password</span>
+                <code className="text-zinc-100">{WP_PASS}</code>
+              </div>
+            </div>
+            <p>Log in to any of the 5 demos via the wp-admin URL:</p>
             <ul className="list-disc pl-5 text-xs space-y-0.5">
               {demos.map((d) => (
                 <li key={d.name}>
                   {d.name}:{" "}
                   <a
-                    href={`${d.url}wp-login.php`}
+                    href={`${d.url}wp-admin`}
                     target="_blank"
                     rel="noreferrer noopener"
                     className="text-indigo-400 hover:underline"
                   >
-                    {d.url}wp-login.php
+                    {d.url}wp-admin
                   </a>
                 </li>
               ))}
             </ul>
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200/90">
+              ⚠️ Although the username/password are the same across all 5
+              demos, each container has its own independent database. Changes
+              made on Demo 1 do not appear on Demo 2.
+            </div>
+            <p className="text-xs text-zinc-500">
+              If a refresh wipes the container (see next section), the WordPress
+              install wizard re-runs on first visit and you&apos;ll need to
+              re-enter these same credentials to restore the demo.
+            </p>
           </Section>
 
           {/* ---- Refresh containers ---- */}

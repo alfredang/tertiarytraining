@@ -7,7 +7,7 @@ export const adminNav: NavItem[] = [
   { href: "/admin/environments", label: "Environments", icon: "▣" },
   { href: "/admin/containers", label: "Containers", icon: "⬢" },
   { href: "/admin/refresh-logs", label: "Refresh Logs", icon: "↻" },
-  { href: "/admin/how-to", label: "How To", icon: "?" },
+  { href: "/how-to", label: "How To", icon: "?" },
   { href: "/admin/settings", label: "Settings", icon: "⚙" },
 ];
 
@@ -16,10 +16,16 @@ export const trainerNav: NavItem[] = [
   { href: "/dashboard/trainer", label: "My Environments", icon: "▣" },
   { href: "/admin/signup-approvals", label: "Signup Approvals", icon: "✓" },
   { href: "/admin/users", label: "Learners", icon: "👥" },
+  { href: "/how-to", label: "How To", icon: "?" },
+];
+
+export const learnerNav: NavItem[] = [
+  { href: "/dashboard/learner", label: "My Environments", icon: "▣" },
+  { href: "/how-to", label: "How To", icon: "?" },
 ];
 
 export function navForRole(role: "ADMIN" | "TRAINER" | "LEARNER"): NavItem[] {
   if (role === "ADMIN") return adminNav;
   if (role === "TRAINER") return trainerNav;
-  return [{ href: "/dashboard/learner", label: "My Environments", icon: "▣" }];
+  return learnerNav;
 }

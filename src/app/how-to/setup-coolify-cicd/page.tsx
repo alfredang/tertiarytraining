@@ -1,18 +1,20 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { DashboardShell } from "@/components/DashboardShell";
-import { adminNav } from "@/lib/adminNav";
+import { navForRole } from "@/lib/adminNav";
 
 export default async function Page() {
-  const user = (await getSessionUser())!;
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
   return (
     <DashboardShell
       user={{ name: user.name, email: user.email, role: user.role }}
-      nav={adminNav}
+      nav={navForRole(user.role)}
     >
       <div className="max-w-3xl">
         <nav className="text-xs text-zinc-500 mb-4">
-          <Link href="/admin/how-to" className="hover:text-zinc-300">
+          <Link href="/how-to" className="hover:text-zinc-300">
             How To
           </Link>{" "}
           / Setup Coolify CI/CD
