@@ -12,7 +12,7 @@ Training Environment Management for Docker-based labs (WordPress, Ubuntu, Linux 
 # Local dev (requires .env with DATABASE_URL, JWT_SECRET, SEED_TOKEN)
 npm install
 npx prisma migrate dev --name <slug>   # generate + apply local migration
-npm run dev                            # next dev (Turbopack)
+npx next dev -p 8016                   # ALWAYS run the dev server on port 8016 locally — `PUBLIC_BASE_URL` in .env and the Google/GitHub dev OAuth callback URLs are pinned to http://localhost:8016. Do not use `npm run dev` (defaults to 3000) or social sign-in will fail.
 
 # Production build (also runs `prisma generate`)
 npm run build

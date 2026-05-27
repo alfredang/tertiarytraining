@@ -7,6 +7,13 @@ import { navForRole } from "@/lib/adminNav";
 
 const guides = [
   {
+    href: "/how-to/workflow",
+    title: "Step-by-Step Workflow",
+    description:
+      "The end-to-end flow for trainers and admins: learner signup → approval → start container → assign environment → idle auto-stop → account expiry.",
+    icon: "→",
+  },
+  {
     href: "/how-to/setup-coolify-cicd",
     title: "Setup Coolify CI/CD",
     description:

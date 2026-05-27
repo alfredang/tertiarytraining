@@ -78,6 +78,44 @@ export default async function Page() {
             </p>
           </Section>
 
+          <Section title="External Ubuntu container (fallback)">
+            <p>
+              If all 5 in-house Ubuntu demos are in use, broken, or refreshing,
+              learners can use the free{" "}
+              <strong>Killercoda Ubuntu Playground</strong> as a drop-in
+              alternative — a fresh Ubuntu VM in the browser, no signup
+              required, ~60 minute session.
+            </p>
+            <a
+              href="https://killercoda.com/playgrounds/scenario/ubuntu"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="block rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4 hover:border-indigo-400/60 hover:bg-indigo-500/15 transition-colors"
+            >
+              <div className="flex items-baseline gap-3">
+                <span className="text-2xl">↗</span>
+                <div className="flex-1">
+                  <div className="font-semibold text-zinc-100">
+                    Killercoda Ubuntu Playground
+                  </div>
+                  <div className="text-xs text-indigo-300 mt-0.5">
+                    killercoda.com/playgrounds/scenario/ubuntu
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-2">
+                    Browser-based Ubuntu terminal hosted by Killercoda. Opens
+                    in a new tab. No login needed; session expires after
+                    inactivity.
+                  </p>
+                </div>
+              </div>
+            </a>
+            <p className="text-xs text-zinc-500">
+              External service — we don&apos;t control uptime, packages, or
+              data persistence. Use only for ad-hoc exercises, not for
+              graded work.
+            </p>
+          </Section>
+
           <Section title="What learners get">
             <ul className="list-disc pl-5 space-y-1">
               <li>

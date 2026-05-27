@@ -77,9 +77,37 @@ export function TrainerEnvList({
                 }}
               />
             ))}
+            {env.environmentName === "Ubuntu" && (
+              <ExternalUbuntuCard />
+            )}
           </div>
         </section>
       ))}
     </div>
+  );
+}
+
+function ExternalUbuntuCard() {
+  return (
+    <a
+      href="https://killercoda.com/playgrounds/scenario/ubuntu"
+      target="_blank"
+      rel="noreferrer noopener"
+      className="rounded-xl border border-dashed border-indigo-500/40 bg-indigo-500/5 p-5 flex flex-col gap-3 hover:border-indigo-400 hover:bg-indigo-500/10 transition-colors"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="font-semibold text-zinc-100">Ubuntu (Killercoda)</h3>
+        <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border border-indigo-400/40 text-indigo-300">
+          External
+        </span>
+      </div>
+      <p className="text-sm text-zinc-400 line-clamp-3">
+        Free browser-based Ubuntu playground hosted by Killercoda. Use as a
+        fallback when all in-house demos are busy. No login required.
+      </p>
+      <div className="mt-auto">
+        <span className="btn btn-primary inline-flex">Open ↗</span>
+      </div>
+    </a>
   );
 }
