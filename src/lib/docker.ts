@@ -76,7 +76,11 @@ class MockDockerService implements DockerService {
 // Dockerode — real Docker control via /var/run/docker.sock.
 // ============================================================================
 class DockerodeService implements DockerService {
-  private docker = new Docker({ socketPath: "/var/run/docker.sock" });
+  private docker: Docker;
+  
+  constructor(client?: Docker) {
+    this.docker = client || new Docker({ socketPath: "/var/run/docker.sock" });
+  }
 
   async stopAndRemove(name: string): Promise<void> {
     try {
@@ -112,8 +116,6 @@ class DockerodeService implements DockerService {
 
   async run(image: string, name: string, port: number, opts?: RunOptions): Promise<RunResult> {
     const internalPort = opts?.internalPort ?? port;
-    // Pull only if the image isn't already present locally (custom-built
-    // images wouldn't be on the registry).
     try {
       await this.docker.getImage(image).inspect();
     } catch {
@@ -141,16 +143,9 @@ class DockerodeService implements DockerService {
     return { containerUrl: `http://${host}:${port}/` };
   }
 
-  /**
-   * Soft-reset a WordPress demo: leaves the container running, wipes the DB,
-   * and restores from the golden SQL snapshot — preserving credentials and
-   * sample state without restarting the container.
-   */
   async softResetWp(info: WpContainerInfo): Promise<RunResult> {
     const dbContainer = this.docker.getContainer(info.dbContainer);
 
-    // Discover credentials + DB name from the DB container's env.
-    // Try MARIADB_* first (modern MariaDB images), fall back to MYSQL_*.
     const inspect = await dbContainer.inspect();
     const env = inspect.Config?.Env ?? [];
     const envMap: Record<string, string> = {};
@@ -163,11 +158,6 @@ class DockerodeService implements DockerService {
       throw new Error(`No root password env var on ${info.dbContainer} (tried MARIADB_ROOT_PASSWORD, MYSQL_ROOT_PASSWORD)`);
     const dbName = envMap.MARIADB_DATABASE ?? envMap.MYSQL_DATABASE ?? "wordpress";
 
-    // The golden SQL file is bind-mounted into THIS app container at info.goldenSqlPath.
-    // We need it accessible inside the DB container. Two ways:
-    //   (a) Copy via docker.putArchive into a temp path in the DB container, then mysql < it
-    //   (b) Have the host bind-mount the same dir into the DB container — not the case here
-    // Path (a): read the SQL bytes from our filesystem, tar them up, putArchive into /tmp/restore.sql
     const fs = await import("node:fs/promises");
     const sql = await fs.readFile(info.goldenSqlPath);
     const tar = await import("tar-stream");
@@ -179,7 +169,6 @@ class DockerodeService implements DockerService {
     const tarBuf = Buffer.concat(chunks);
     await dbContainer.putArchive(tarBuf, { path: "/tmp" });
 
-    // Drop & recreate the per-demo DB, then restore from /tmp/restore.sql
     const exec = await dbContainer.exec({
       Cmd: [
         "sh",
@@ -200,8 +189,50 @@ class DockerodeService implements DockerService {
     if (result.ExitCode !== 0)
       throw new Error(`mariadb restore exited ${result.ExitCode}`);
 
-    // WP container is unchanged, URL stays the same.
     return { containerUrl: info.containerUrl };
+  }
+}
+
+// ============================================================================
+// Dual Router — sends Ubuntu to remote, everything else to local
+// ============================================================================
+class DualDockerService implements DockerService {
+  private local = new DockerodeService();
+  private remote: DockerodeService | null = null;
+
+  constructor() {
+    const host = process.env.REMOTE_DOCKER_HOST;
+    if (host) {
+      const port = Number(process.env.REMOTE_DOCKER_PORT || 2375);
+      // Construct URL appropriately for Dockerode
+      const isUrl = host.startsWith("http") || host.startsWith("tcp");
+      const remoteClient = new Docker(isUrl ? { host, port } : { host: `http://${host}`, port });
+      this.remote = new DockerodeService(remoteClient);
+      console.log(`[docker] initialized Remote Docker engine at ${host}:${port} for Ubuntu containers`);
+    }
+  }
+
+  private isRemote(name: string): boolean {
+    return name.toLowerCase().includes("ubuntu");
+  }
+
+  private getService(name: string): DockerService {
+    if (this.isRemote(name)) {
+      if (!this.remote) {
+        console.warn(`[docker] WARNING: Ubuntu container requested but REMOTE_DOCKER_HOST is not set. Falling back to local Docker engine.`);
+        return this.local;
+      }
+      return this.remote;
+    }
+    return this.local;
+  }
+
+  async stopAndRemove(name: string): Promise<void> { return this.getService(name).stopAndRemove(name); }
+  async start(name: string): Promise<void> { return this.getService(name).start(name); }
+  async stop(name: string): Promise<void> { return this.getService(name).stop(name); }
+  
+  async run(image: string, name: string, port: number, opts?: RunOptions): Promise<RunResult> {
+    return this.getService(name).run(image, name, port, opts);
   }
 }
 
@@ -212,10 +243,10 @@ export function dockerService(): DockerService {
   const mode = (process.env.DOCKER_HOST_MODE ?? "mock").toLowerCase();
   if (mode === "dockerode") {
     try {
-      _service = new DockerodeService();
-      console.log("[docker] using DockerodeService");
+      _service = new DualDockerService();
+      console.log("[docker] using DualDockerService (Dockerode)");
     } catch (err) {
-      console.error("[docker] failed to init DockerodeService, falling back to mock", err);
+      console.error("[docker] failed to init DualDockerService, falling back to mock", err);
       _service = new MockDockerService();
     }
   } else {
