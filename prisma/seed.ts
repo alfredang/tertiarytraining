@@ -42,6 +42,13 @@ async function main() {
       defaultPort: 8096,
       accessUrl: "http://168.231.119.201:8096/",
     },
+    {
+      name: "Kubernetes",
+      description: "Kubernetes playground (external, via Killercoda). Browser-based cluster — no setup, ~60 min session.",
+      dockerImage: "external",
+      defaultPort: 0,
+      accessUrl: "https://killercoda.com/playgrounds/scenario/kubernetes",
+    },
   ];
 
   for (const env of samples) {
