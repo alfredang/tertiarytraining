@@ -1,19 +1,41 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole, hashPassword } from "@/lib/auth";
 import { userCreateSchema } from "@/lib/validation";
+
+const roleQuerySchema = z.enum(["LEARNER", "TRAINER", "ADMIN"]);
+const statusQuerySchema = z.enum(["PENDING", "ACTIVE", "SUSPENDED", "REJECTED"]);
 
 export async function GET(req: Request) {
   const { user, error, status } = await requireRole("ADMIN", "TRAINER");
   if (!user) return NextResponse.json({ error }, { status });
   const { searchParams } = new URL(req.url);
-  const statusFilter = searchParams.get("status") ?? undefined;
-  const role = searchParams.get("role") ?? undefined;
-  // Trainers see only learners.
-  const roleFilter = user.role === "TRAINER" ? "LEARNER" : (role as "LEARNER" | "TRAINER" | "ADMIN" | undefined);
+
+  const rawStatus = searchParams.get("status");
+  let statusFilter: z.infer<typeof statusQuerySchema> | undefined;
+  if (rawStatus) {
+    const parsed = statusQuerySchema.safeParse(rawStatus);
+    if (!parsed.success) return NextResponse.json({ error: "Invalid status filter" }, { status: 400 });
+    statusFilter = parsed.data;
+  }
+
+  // Trainers see only learners — their role filter is forced regardless of input.
+  let roleFilter: z.infer<typeof roleQuerySchema> | undefined;
+  if (user.role === "TRAINER") {
+    roleFilter = "LEARNER";
+  } else {
+    const rawRole = searchParams.get("role");
+    if (rawRole) {
+      const parsed = roleQuerySchema.safeParse(rawRole);
+      if (!parsed.success) return NextResponse.json({ error: "Invalid role filter" }, { status: 400 });
+      roleFilter = parsed.data;
+    }
+  }
+
   const users = await prisma.user.findMany({
     where: {
-      ...(statusFilter ? { status: statusFilter as "PENDING" | "ACTIVE" | "SUSPENDED" | "REJECTED" } : {}),
+      ...(statusFilter ? { status: statusFilter } : {}),
       ...(roleFilter ? { role: roleFilter } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -37,6 +59,9 @@ export async function POST(req: Request) {
       passwordHash,
       role: parsed.data.role,
       status: parsed.data.status ?? "ACTIVE",
+      // Trainers never expire — mirror the PUT route's invariant explicitly
+      // so a future addition of expiresAt to userCreateSchema can't silently break it.
+      ...(parsed.data.role === "TRAINER" ? { expiresAt: null } : {}),
     },
     select: { id: true, email: true, name: true, role: true, status: true, createdAt: true },
   });

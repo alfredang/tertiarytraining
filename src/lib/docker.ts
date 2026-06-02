@@ -10,6 +10,10 @@
 
 import Docker from "dockerode";
 
+// Mock-mode chatter is useful in dev but pure noise in prod logs.
+const mockLog: (...args: unknown[]) => void =
+  process.env.NODE_ENV === "production" ? () => {} : console.log;
+
 export type RunResult = { containerUrl: string };
 
 export type WpContainerInfo = {
@@ -48,10 +52,10 @@ export interface DockerService {
 // ============================================================================
 class MockDockerService implements DockerService {
   async stopAndRemove(name: string): Promise<void> {
-    console.log(`[docker:mock] stop+remove ${name}`);
+    mockLog(`[docker:mock] stop+remove ${name}`);
   }
   async run(image: string, name: string, port: number, opts?: RunOptions): Promise<RunResult> {
-    console.log(
+    mockLog(
       `[docker:mock] run ${image} as ${name} on :${port}` +
         (opts?.internalPort ? ` (internal :${opts.internalPort})` : "") +
         (opts?.env?.length ? ` env=${opts.env.join(",")}` : ""),
@@ -61,14 +65,14 @@ class MockDockerService implements DockerService {
     return { containerUrl: `${base.replace(/\/$/, "")}:${port}/?s=${token}` };
   }
   async softResetWp(info: WpContainerInfo): Promise<RunResult> {
-    console.log(`[docker:mock] soft-reset ${info.wpContainer} from ${info.goldenSqlPath}`);
+    mockLog(`[docker:mock] soft-reset ${info.wpContainer} from ${info.goldenSqlPath}`);
     return { containerUrl: info.containerUrl };
   }
   async start(name: string): Promise<void> {
-    console.log(`[docker:mock] start ${name}`);
+    mockLog(`[docker:mock] start ${name}`);
   }
   async stop(name: string): Promise<void> {
-    console.log(`[docker:mock] stop ${name}`);
+    mockLog(`[docker:mock] stop ${name}`);
   }
 }
 

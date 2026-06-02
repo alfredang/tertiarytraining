@@ -15,6 +15,15 @@ export const signupSchema = z.object({
   name: nameSchema,
 });
 
+export const otpSendSchema = z.object({
+  email: emailSchema,
+});
+
+export const otpVerifySchema = z.object({
+  email: emailSchema,
+  code: z.string().regex(/^\d{6}$/, "Code must be 6 digits"),
+});
+
 export const environmentSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().min(1).max(1000),

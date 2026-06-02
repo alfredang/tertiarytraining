@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 
@@ -15,8 +16,12 @@ import { hashPassword } from "@/lib/auth";
 export async function POST(req: Request) {
   const expected = process.env.SEED_TOKEN;
   if (!expected) return NextResponse.json({ error: "SEED_TOKEN not configured" }, { status: 500 });
-  const provided = req.headers.get("x-seed-token");
-  if (provided !== expected) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const provided = req.headers.get("x-seed-token") ?? "";
+  const providedBuf = Buffer.from(provided);
+  const expectedBuf = Buffer.from(expected);
+  if (providedBuf.length !== expectedBuf.length || !timingSafeEqual(providedBuf, expectedBuf)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => ({}));
   const email = (body.email ?? "admin@tertiary.local").toString();
@@ -32,5 +37,5 @@ export async function POST(req: Request) {
     select: { id: true, email: true, role: true, status: true },
   });
 
-  return NextResponse.json({ ok: true, user, password });
+  return NextResponse.json({ ok: true, user });
 }
