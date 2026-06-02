@@ -22,6 +22,7 @@
     "arctic": "^2.3.4",
     "bcryptjs": "^2.4.3",
     "dockerode": "^4.0.2",
+    "googleapis": "^144.0.0",
     "jose": "^5.9.6",
     "tar-stream": "^3.1.7",
     "next": "16.0.0",

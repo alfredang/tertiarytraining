@@ -7,6 +7,14 @@ import {
   setGoogleOAuthCredentials,
   getGitHubOAuthCredentials,
   setGitHubOAuthCredentials,
+  getGmailOAuthCredentials,
+  setGmailOAuthCredentials,
+  isOtpLoginEnabled,
+  isOtpAutoSignupEnabled,
+  getOtpEmailTemplate,
+  setOtpLoginEnabled,
+  setOtpAutoSignupEnabled,
+  setOtpEmailTemplate,
 } from "@/lib/settings";
 
 function maskSecret(s: string | null | undefined): string | null {
@@ -25,12 +33,35 @@ export async function GET() {
   if (user.role === "ADMIN") {
     const google = await getGoogleOAuthCredentials();
     const github = await getGitHubOAuthCredentials();
+    const gmail = await getGmailOAuthCredentials();
     payload.google = google
       ? { clientId: google.clientId, clientSecretMasked: maskSecret(google.clientSecret), configured: true }
       : { clientId: "", clientSecretMasked: null, configured: false };
     payload.github = github
       ? { clientId: github.clientId, clientSecretMasked: maskSecret(github.clientSecret), configured: true }
       : { clientId: "", clientSecretMasked: null, configured: false };
+    payload.gmail = gmail
+      ? {
+          clientId: gmail.clientId,
+          clientSecretMasked: maskSecret(gmail.clientSecret),
+          refreshTokenMasked: maskSecret(gmail.refreshToken),
+          fromEmail: gmail.fromEmail,
+          fromName: gmail.fromName,
+          configured: true,
+        }
+      : {
+          clientId: "",
+          clientSecretMasked: null,
+          refreshTokenMasked: null,
+          fromEmail: "",
+          fromName: "Tertiary Training",
+          configured: false,
+        };
+    payload.otp = {
+      loginEnabled: await isOtpLoginEnabled(),
+      autoSignupEnabled: await isOtpAutoSignupEnabled(),
+      template: await getOtpEmailTemplate(),
+    };
   }
   return NextResponse.json(payload);
 }
@@ -81,6 +112,56 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "GitHub clientSecret missing — paste it once when first configuring." }, { status: 400 });
       }
       await setGitHubOAuthCredentials(clientId.trim(), finalSecret);
+    }
+  }
+
+  // Gmail OAuth (optional). Five fields total — clientId, clientSecret,
+  // refreshToken, fromEmail, fromName. Blank secret/refreshToken means
+  // "keep existing" so the admin can update fromEmail without re-pasting.
+  if (body.gmail && typeof body.gmail === "object") {
+    const g = body.gmail as Record<string, string | undefined>;
+    const current = await getGmailOAuthCredentials();
+    const clientId = g.clientId?.trim() ?? current?.clientId ?? "";
+    const clientSecret =
+      g.clientSecret && g.clientSecret.trim().length > 0
+        ? g.clientSecret.trim()
+        : current?.clientSecret ?? "";
+    const refreshToken =
+      g.refreshToken && g.refreshToken.trim().length > 0
+        ? g.refreshToken.trim()
+        : current?.refreshToken ?? "";
+    const fromEmail = g.fromEmail?.trim() ?? current?.fromEmail ?? "";
+    const fromName = g.fromName?.trim() || current?.fromName || "Tertiary Training";
+
+    if (!clientId || !clientSecret || !refreshToken || !fromEmail) {
+      return NextResponse.json(
+        { error: "Gmail fields missing — clientId, clientSecret, refreshToken, and fromEmail are all required on first configuration." },
+        { status: 400 },
+      );
+    }
+    await setGmailOAuthCredentials({ clientId, clientSecret, refreshToken, fromEmail, fromName });
+  }
+
+  // OTP login config + email template (all optional individually).
+  if (body.otp && typeof body.otp === "object") {
+    const o = body.otp as Record<string, unknown>;
+    if (typeof o.loginEnabled === "boolean") {
+      await setOtpLoginEnabled(o.loginEnabled);
+    }
+    if (typeof o.autoSignupEnabled === "boolean") {
+      await setOtpAutoSignupEnabled(o.autoSignupEnabled);
+    }
+    if (o.template && typeof o.template === "object") {
+      const t = o.template as { subject?: unknown; body?: unknown };
+      if (typeof t.subject === "string" && typeof t.body === "string") {
+        if (t.subject.trim().length === 0) {
+          return NextResponse.json({ error: "OTP email subject cannot be blank" }, { status: 400 });
+        }
+        if (t.body.trim().length === 0) {
+          return NextResponse.json({ error: "OTP email body cannot be blank" }, { status: 400 });
+        }
+        await setOtpEmailTemplate(t.subject, t.body);
+      }
     }
   }
 

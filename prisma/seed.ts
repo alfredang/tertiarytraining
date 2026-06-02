@@ -59,6 +59,24 @@ async function main() {
     });
   }
 
+  const otpDefaults: Array<{ key: string; value: string }> = [
+    { key: "otp_login_enabled", value: "false" },
+    { key: "otp_auto_signup_enabled", value: "true" },
+    { key: "otp_email_subject", value: "Your Tertiary Training login code" },
+    {
+      key: "otp_email_body",
+      value:
+        "Hi,\n\nYour one-time login code is {OTP}.\n\nIt expires in {EXPIRY_MINUTES} minutes. If you didn't request this code, you can safely ignore this email.\n\n— Tertiary Training\n{SITE_URL}",
+    },
+  ];
+  for (const s of otpDefaults) {
+    await prisma.systemSetting.upsert({
+      where: { key: s.key },
+      update: {},
+      create: s,
+    });
+  }
+
   console.log(`Seed complete. Admin: ${adminEmail} / ${adminPassword}`);
 }
 
