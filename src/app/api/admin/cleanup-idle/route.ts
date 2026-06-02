@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { dockerService, hostContainerNamesFor } from "@/lib/docker";
 
@@ -17,8 +18,12 @@ const IDLE_HOURS = Number(process.env.IDLE_AUTOSTOP_HOURS ?? "2");
 export async function POST(req: Request) {
   const expected = process.env.SEED_TOKEN;
   if (!expected) return NextResponse.json({ error: "SEED_TOKEN not set" }, { status: 500 });
-  if (req.headers.get("x-seed-token") !== expected)
+  const provided = req.headers.get("x-seed-token") ?? "";
+  const providedBuf = Buffer.from(provided);
+  const expectedBuf = Buffer.from(expected);
+  if (providedBuf.length !== expectedBuf.length || !timingSafeEqual(providedBuf, expectedBuf)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const cutoff = new Date(Date.now() - IDLE_HOURS * 60 * 60 * 1000);
 
