@@ -90,12 +90,12 @@ server {
     # WebSocket-upgrading reverse proxies. SUBFOLDER on the container is set
     # to the matching path so Selkies generates correct asset URLs.
 
-    # Ubuntu demos: host 8091..8095 -> /lab/ubuntu-1/ .. ubuntu-5/ (AWS Remote)
-    location /lab/ubuntu-1/ { proxy_pass http://47.128.153.3:8091; include /etc/nginx/snippets/tertiary-lab-proxy.conf; }
-    location /lab/ubuntu-2/ { proxy_pass http://47.128.153.3:8092; include /etc/nginx/snippets/tertiary-lab-proxy.conf; }
-    location /lab/ubuntu-3/ { proxy_pass http://47.128.153.3:8093; include /etc/nginx/snippets/tertiary-lab-proxy.conf; }
-    location /lab/ubuntu-4/ { proxy_pass http://47.128.153.3:8094; include /etc/nginx/snippets/tertiary-lab-proxy.conf; }
-    location /lab/ubuntu-5/ { proxy_pass http://47.128.153.3:8095; include /etc/nginx/snippets/tertiary-lab-proxy.conf; }
+    # Ubuntu demos: host 8091..8095 -> /lab/ubuntu-1/ .. ubuntu-5/ (local engine)
+    location /lab/ubuntu-1/ { proxy_pass http://127.0.0.1:8091; include /etc/nginx/snippets/tertiary-lab-proxy.conf; }
+    location /lab/ubuntu-2/ { proxy_pass http://127.0.0.1:8092; include /etc/nginx/snippets/tertiary-lab-proxy.conf; }
+    location /lab/ubuntu-3/ { proxy_pass http://127.0.0.1:8093; include /etc/nginx/snippets/tertiary-lab-proxy.conf; }
+    location /lab/ubuntu-4/ { proxy_pass http://127.0.0.1:8094; include /etc/nginx/snippets/tertiary-lab-proxy.conf; }
+    location /lab/ubuntu-5/ { proxy_pass http://127.0.0.1:8095; include /etc/nginx/snippets/tertiary-lab-proxy.conf; }
 
 
     # Kali demos: host 8096..8100 -> /lab/kali-1/ .. kali-5/
