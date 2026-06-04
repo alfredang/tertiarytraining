@@ -194,20 +194,19 @@ export default async function Page() {
 
             <h3 className="font-medium text-zinc-100 mt-3">What happens under the hood (real Docker mode)</h3>
             <ol className="list-decimal pl-5 space-y-1 text-zinc-400">
-              <li>The WP container <strong>keeps running</strong> — no restart, no downtime</li>
-              <li>The DB container&apos;s <code>wordpress</code> database is dropped</li>
-              <li>The golden SQL snapshot under <code>/opt/tertiarytraining/wp-golden/demo-N.sql</code> is restored into the DB</li>
-              <li>The shared <code>tertiarytraining</code> admin credentials and any baseline sample content are <strong>preserved</strong></li>
-              <li>Any learner-added posts, pages, plugins activations are <strong>gone</strong></li>
+              <li>The existing wp + db pair is <strong>destroyed</strong> (containers, volumes, network)</li>
+              <li>The latest <code>wordpress</code> and <code>mariadb</code> images are pulled</li>
+              <li>A <strong>fresh, blank</strong> wp + db pair is created and started</li>
+              <li>Any learner-added posts, pages, plugin activations are <strong>gone</strong> — it&apos;s a brand-new site</li>
               <li>Status flips back to <code>RUNNING</code> and a row is added to <Link href="/admin/refresh-logs" className="text-indigo-400 hover:underline">Refresh Logs</Link></li>
-              <li>Total time: ~1-2 seconds per container</li>
+              <li>Total time: ~10–30 seconds per container (image pull + boot)</li>
             </ol>
             <p className="text-xs text-zinc-500">
               See{" "}
               <Link href="/how-to/enable-real-docker" className="text-indigo-400 hover:underline">
                 Enable Real Docker Control
               </Link>{" "}
-              for the one-time setup to capture each demo&apos;s golden snapshot.
+              for the one-time setup (mount the Docker socket + set the mode).
             </p>
 
             <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200/90">

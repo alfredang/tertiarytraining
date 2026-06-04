@@ -32,8 +32,8 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const svc = dockerService();
 
   try {
-    // On-demand: spawn a fresh container (WordPress = wp+db pair restored to a
-    // clean golden snapshot), always pulling the latest image.
+    // On-demand: spawn a fresh container (WordPress = a new wp+db pair),
+    // always pulling the latest image.
     const { containerUrl } = await svc.spawnLab({
       environmentName: container.environment.name,
       image: container.environment.dockerImage,

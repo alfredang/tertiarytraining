@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { dockerService, wpSoftResetTarget } from "./docker";
+import { dockerService } from "./docker";
 import type { RefreshScope } from "@prisma/client";
 
 export async function refreshOneContainer(containerId: string, actorId: string) {
@@ -16,33 +16,14 @@ export async function refreshOneContainer(containerId: string, actorId: string) 
 
   const svc = dockerService();
   try {
-    // WordPress containers get a soft-reset: DB restored from golden snapshot,
-    // container keeps running, credentials preserved.
-    const wpTarget = wpSoftResetTarget({
+    // Refresh = recreate fresh: destroy the existing container(s) and spawn a
+    // new lab from the latest image (same on-demand path as Start).
+    const { containerUrl } = await svc.spawnLab({
       environmentName: container.environment.name,
+      image: container.environment.dockerImage,
+      name: container.name,
       port: container.port,
-      containerUrl: container.containerUrl,
-      displayName: container.name,
     });
-
-    let containerUrl: string;
-    if (wpTarget && svc.softResetWp) {
-      const result = await svc.softResetWp(wpTarget);
-      containerUrl = result.containerUrl;
-    } else {
-      await svc.stopAndRemove(container.name);
-      // linuxserver/kali-linux images listen on port 3000 inside the
-      // container regardless of host port mapping.
-      const envName = container.environment.name;
-      const internalPort = envName === "Kali Linux" ? 3000 : undefined;
-      const result = await svc.run(
-        container.environment.dockerImage,
-        container.name,
-        container.port,
-        { internalPort },
-      );
-      containerUrl = result.containerUrl;
-    }
 
     await prisma.dockerContainer.update({
       where: { id: containerId },

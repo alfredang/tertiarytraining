@@ -27,8 +27,8 @@ export default async function Page() {
           <code>dockerode</code>, so <strong>Start</strong> / <strong>Stop</strong>{" "}
           actually control the host&apos;s Docker containers. The app uses an{" "}
           <strong>on-demand lifecycle</strong>: <strong>Start</strong> spawns a
-          fresh container (WordPress = a new wp + db pair restored to a clean
-          golden snapshot, latest image pulled every time); <strong>Stop</strong>{" "}
+          fresh container (WordPress = a new wp + db pair, latest image pulled
+          every time so it&apos;s always up to date); <strong>Stop</strong>{" "}
           deletes the container entirely. A stopped lab therefore leaves nothing
           running and consumes <strong>zero memory</strong>.
         </p>
@@ -47,7 +47,7 @@ export default async function Page() {
                 <Row
                   k="Start (WordPress)"
                   a="No-op — only flips DB status"
-                  b="Pulls latest images, creates a fresh wp + db pair on a dedicated network, restores the golden snapshot, starts WordPress. ~10–30 s."
+                  b="Pulls latest images, creates a fresh blank wp + db pair on a dedicated network, starts WordPress. ~10–30 s."
                 />
                 <Row
                   k="Stop (WordPress)"
@@ -57,7 +57,7 @@ export default async function Page() {
                 <Row
                   k="Refresh WordPress"
                   a="No-op — only logs"
-                  b="Soft-reset: restores DB from golden SQL snapshot in place. Keeps credentials. ~1-2 s."
+                  b="Recreate fresh: destroys the pair and spawns a new one from the latest image."
                 />
                 <Row
                   k="Latest image on Start"
@@ -73,38 +73,7 @@ export default async function Page() {
             </table>
           </Section>
 
-          <Step number={1} title="Capture WordPress golden snapshots on the host">
-            <p>
-              SSH to the Coolify host as root, copy{" "}
-              <code>scripts/tt-wp-bootstrap.sh</code> from this repo, and run it
-              once:
-            </p>
-            <pre className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs overflow-x-auto">
-{`# As root on the Coolify host:
-curl -sL https://raw.githubusercontent.com/alfredang/tertiarytraining/main/scripts/tt-wp-bootstrap.sh \\
-  -o /usr/local/bin/tt-wp-bootstrap.sh
-chmod +x /usr/local/bin/tt-wp-bootstrap.sh
-/usr/local/bin/tt-wp-bootstrap.sh`}
-            </pre>
-            <p>The script will, for each of the 5 demo containers:</p>
-            <ul className="list-disc pl-5 space-y-0.5 text-xs">
-              <li>Install WP-CLI inside the container (if needed)</li>
-              <li>
-                Ensure WordPress is installed with the shared credentials{" "}
-                (<code>tertiarytraining</code> / <code>Tertiary12345</code>)
-              </li>
-              <li>
-                Capture a golden SQL snapshot to{" "}
-                <code>/opt/tertiarytraining/wp-golden/demo-{`{1..5}`}.sql</code>
-              </li>
-            </ul>
-            <p className="text-xs text-zinc-500">
-              Idempotent — safe to re-run any time you want to update the
-              &ldquo;golden state&rdquo; after editing the demos.
-            </p>
-          </Step>
-
-          <Step number={2} title="Mount the Docker socket into the app container">
+          <Step number={1} title="Mount the Docker socket into the app container">
             <p>
               In Coolify → your app → <strong>Storage</strong> → add a bind
               mount:
@@ -127,26 +96,14 @@ chmod +x /usr/local/bin/tt-wp-bootstrap.sh
               control of the host Docker daemon — same security level as root
               on the host. Only do this on hosts you control.
             </div>
+            <p className="text-xs text-zinc-500">
+              That&apos;s the only mount required — there are no golden
+              snapshots to mount. Every Start pulls the latest image and
+              creates a fresh, blank WordPress.
+            </p>
           </Step>
 
-          <Step number={3} title="Mount the golden snapshots into the app container">
-            <p>Add a second bind mount in Coolify Storage:</p>
-            <table className="w-full text-xs border border-zinc-800 rounded-lg overflow-hidden">
-              <thead className="bg-zinc-900 text-zinc-400">
-                <tr>
-                  <th className="text-left px-3 py-2">Field</th>
-                  <th className="text-left px-3 py-2">Value</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800">
-                <Row k="Host path" a="/opt/tertiarytraining/wp-golden" b="" single />
-                <Row k="Container path" a="/opt/tertiarytraining/wp-golden" b="" single />
-                <Row k="Read-only" a="Yes" b="" single />
-              </tbody>
-            </table>
-          </Step>
-
-          <Step number={4} title="Set the env var">
+          <Step number={2} title="Set the env var">
             <p>
               In Coolify → your app → <strong>Environment Variables</strong>:
             </p>
@@ -156,7 +113,7 @@ chmod +x /usr/local/bin/tt-wp-bootstrap.sh
             <p>Save.</p>
           </Step>
 
-          <Step number={5} title="Redeploy">
+          <Step number={3} title="Redeploy">
             <p>
               Click <strong>Redeploy</strong>. On boot the app logs{" "}
               <code>[docker] using DockerodeService</code> — that&apos;s your
@@ -176,7 +133,7 @@ docker build --build-arg DOCKER_GID=<your-gid> -t app .`}
             </pre>
           </Step>
 
-          <Step number={6} title="Verify the on-demand lifecycle">
+          <Step number={4} title="Verify the on-demand lifecycle">
             <p>
               Log in as admin → <Link href="/admin/containers" className="text-indigo-400 hover:underline">Admin → Containers</Link>{" "}
               → filter by <strong>WordPress</strong> → click <strong>Start</strong> on{" "}
@@ -185,32 +142,10 @@ docker build --build-arg DOCKER_GID=<your-gid> -t app .`}
             <ul className="list-disc pl-5 space-y-0.5 text-xs">
               <li>Status flips to <code>REFRESHING</code> (provisioning) then to <code>RUNNING</code> once the pair is up (~10–30 s on first pull).</li>
               <li>On the host, <code>docker ps</code> now shows <code>wordpress-demo1-wordpress-1</code> and <code>wordpress-demo1-db-1</code> — they did not exist before Start.</li>
-              <li>Open <code>http://168.231.119.201:8081/wp-admin</code> — the <code>tertiarytraining</code> login works against the clean golden state.</li>
+              <li>Open <code>http://168.231.119.201:8081/</code> — a fresh WordPress install wizard (brand-new blank site on the latest image).</li>
               <li>Click <strong>Stop</strong>: status goes to <code>STOPPED</code> and <code>docker ps -a</code> shows the pair is <em>gone</em> (not just stopped) — zero memory used.</li>
             </ul>
           </Step>
-
-          <Section title="Updating the &ldquo;golden state&rdquo; later">
-            <p>
-              Want to add new sample pages / plugins / themes to the baseline
-              that every refresh restores to? Edit any one of the 5 demos via
-              its wp-admin to look exactly how you want, then re-run the
-              bootstrap script — it&apos;ll re-capture the snapshots:
-            </p>
-            <pre className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs overflow-x-auto">
-              /usr/local/bin/tt-wp-bootstrap.sh
-            </pre>
-            <p>
-              Note: the script captures each demo independently — if you only
-              edited <code>WP Demo 1</code>, only <code>demo-1.sql</code>{" "}
-              changes. To make all 5 share the same golden state, copy the SQL
-              file:
-            </p>
-            <pre className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs overflow-x-auto">
-{`cd /opt/tertiarytraining/wp-golden
-for i in 2 3 4 5; do cp demo-1.sql demo-$i.sql; done`}
-            </pre>
-          </Section>
 
           <Section title="Reverting to mock mode">
             <p>

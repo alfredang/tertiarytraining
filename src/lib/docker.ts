@@ -30,7 +30,6 @@ const LAB = {
   dbUser: process.env.WP_DB_USER ?? "wpuser",
   dbPassword: process.env.WP_DB_PASSWORD ?? "wp_lab_pw",
   dbRootPassword: process.env.WP_DB_ROOT_PASSWORD ?? "wp_lab_root_pw",
-  goldenDir: process.env.WP_GOLDEN_DIR ?? "/opt/tertiarytraining/wp-golden",
 };
 
 /** Describes the lab a DockerContainer row maps to, for spawn/destroy. */
@@ -42,19 +41,6 @@ export type LabSpec = {
   name: string;
   /** Host port (also the WordPress slot key: 8080 + slot). */
   port: number;
-};
-
-export type WpContainerInfo = {
-  /** Display name in our DB, e.g. "WP Demo 1" */
-  displayName: string;
-  /** Docker container hosting WordPress, e.g. "wordpress-demo1-wordpress-1" */
-  wpContainer: string;
-  /** Docker container hosting MariaDB, e.g. "wordpress-demo1-db-1" */
-  dbContainer: string;
-  /** Path inside the app container to the golden SQL snapshot (bind-mounted from host) */
-  goldenSqlPath: string;
-  /** Public access URL (we return this unchanged after a soft reset) */
-  containerUrl: string;
 };
 
 export type RunOptions = {
@@ -71,12 +57,10 @@ export interface DockerService {
   start(name: string): Promise<void>;
   /** Stop a running container by name (preserves data; not destructive). */
   stop(name: string): Promise<void>;
-  /** Optional — present in dockerode mode only. Restores the WP DB from a golden snapshot. */
-  softResetWp?(info: WpContainerInfo): Promise<RunResult>;
   /**
    * On-demand lifecycle: create a fresh container (or wp+db pair) from scratch,
-   * always pulling the latest image. For WordPress, the DB is restored to a
-   * clean golden snapshot so every start is a pristine lab. Returns the URL.
+   * always pulling the latest image so every start runs an up-to-date, blank
+   * lab. Returns the URL.
    */
   spawnLab(spec: LabSpec): Promise<RunResult>;
   /**
@@ -110,10 +94,6 @@ class MockDockerService implements DockerService {
     const base = process.env.PUBLIC_BASE_URL ?? "http://localhost";
     const token = Math.random().toString(36).slice(2, 8);
     return { containerUrl: `${base.replace(/\/$/, "")}:${port}/?s=${token}` };
-  }
-  async softResetWp(info: WpContainerInfo): Promise<RunResult> {
-    mockLog(`[docker:mock] soft-reset ${info.wpContainer} from ${info.goldenSqlPath}`);
-    return { containerUrl: info.containerUrl };
   }
   async start(name: string): Promise<void> {
     mockLog(`[docker:mock] start ${name}`);
@@ -212,98 +192,6 @@ class DockerodeService implements DockerService {
     return { containerUrl: this.hostUrl(port) };
   }
 
-  async softResetWp(info: WpContainerInfo): Promise<RunResult> {
-    const dbContainer = this.docker.getContainer(info.dbContainer);
-
-    // Discover credentials + DB name from the DB container's env.
-    // Try MARIADB_* first (modern MariaDB images), fall back to MYSQL_*.
-    const inspect = await dbContainer.inspect();
-    const env = inspect.Config?.Env ?? [];
-    const envMap: Record<string, string> = {};
-    for (const e of env) {
-      const idx = e.indexOf("=");
-      if (idx > 0) envMap[e.slice(0, idx)] = e.slice(idx + 1);
-    }
-    const rootPw = envMap.MARIADB_ROOT_PASSWORD ?? envMap.MYSQL_ROOT_PASSWORD;
-    if (!rootPw)
-      throw new Error(`No root password env var on ${info.dbContainer} (tried MARIADB_ROOT_PASSWORD, MYSQL_ROOT_PASSWORD)`);
-    const dbName = envMap.MARIADB_DATABASE ?? envMap.MYSQL_DATABASE ?? "wordpress";
-
-    await this.restoreSqlIntoDb(info.dbContainer, dbName, rootPw, info.goldenSqlPath);
-
-    // WP container is unchanged, URL stays the same.
-    return { containerUrl: info.containerUrl };
-  }
-
-  /**
-   * Drop & recreate `dbName` inside `dbContainerName`, then restore it from the
-   * golden SQL file at `sqlPath` (read from THIS app container's filesystem and
-   * streamed into the DB container via putArchive — no host bind-mount needed).
-   */
-  private async restoreSqlIntoDb(
-    dbContainerName: string,
-    dbName: string,
-    rootPw: string,
-    sqlPath: string,
-  ): Promise<void> {
-    const dbContainer = this.docker.getContainer(dbContainerName);
-    const fs = await import("node:fs/promises");
-    const sql = await fs.readFile(sqlPath);
-    const tar = await import("tar-stream");
-    const pack = tar.pack();
-    pack.entry({ name: "restore.sql" }, sql);
-    pack.finalize();
-    const chunks: Buffer[] = [];
-    for await (const chunk of pack as unknown as AsyncIterable<Buffer>) chunks.push(chunk);
-    await dbContainer.putArchive(Buffer.concat(chunks), { path: "/tmp" });
-
-    const exec = await dbContainer.exec({
-      Cmd: [
-        "sh",
-        "-c",
-        `mariadb -u root -p"${rootPw}" -e "DROP DATABASE IF EXISTS \\\`${dbName}\\\`; CREATE DATABASE \\\`${dbName}\\\`;" && ` +
-          `mariadb -u root -p"${rootPw}" "${dbName}" < /tmp/restore.sql && rm -f /tmp/restore.sql`,
-      ],
-      AttachStdout: true,
-      AttachStderr: true,
-    });
-    const stream = await exec.start({ hijack: true, stdin: false });
-    await new Promise<void>((resolve, reject) => {
-      stream.on("end", resolve);
-      stream.on("error", reject);
-      stream.resume();
-    });
-    const result = await exec.inspect();
-    if (result.ExitCode !== 0) throw new Error(`mariadb restore exited ${result.ExitCode}`);
-  }
-
-  /** Poll a MariaDB container until it accepts connections, or time out. */
-  private async waitForDb(dbContainerName: string, rootPw: string, timeoutMs = 90_000): Promise<void> {
-    const c = this.docker.getContainer(dbContainerName);
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      try {
-        const exec = await c.exec({
-          Cmd: ["sh", "-c", `mariadb -u root -p"${rootPw}" -e "SELECT 1" >/dev/null 2>&1`],
-          AttachStdout: true,
-          AttachStderr: true,
-        });
-        const stream = await exec.start({ hijack: true, stdin: false });
-        await new Promise<void>((resolve) => {
-          stream.on("end", resolve);
-          stream.on("error", () => resolve());
-          stream.resume();
-        });
-        const r = await exec.inspect();
-        if (r.ExitCode === 0) return;
-      } catch {
-        // container may not be ready to exec yet — retry
-      }
-      await new Promise((r) => setTimeout(r, 2_000));
-    }
-    throw new Error(`Database ${dbContainerName} not ready after ${timeoutMs}ms`);
-  }
-
   private async ensureNetwork(name: string): Promise<void> {
     try {
       await this.docker.getNetwork(name).inspect();
@@ -331,16 +219,16 @@ class DockerodeService implements DockerService {
   }
 
   /**
-   * Create a fresh WordPress + MariaDB pair on a dedicated network, wait for the
-   * DB, restore the golden snapshot (clean lab), then start WordPress. Always
-   * pulls the latest images. Idempotent — any prior pair is destroyed first.
+   * Create a fresh WordPress + MariaDB pair on a dedicated network and start
+   * them. Always pulls the latest images first, so every Start runs an
+   * up-to-date, blank WordPress (the install wizard runs on first visit).
+   * Idempotent — any prior pair is destroyed first.
    */
   private async spawnWordpress(slot: number, hostPort: number): Promise<RunResult> {
     const network = `tt-wp-demo${slot}`;
     const dbName = `wordpress-demo${slot}-db-1`;
     const wpName = `wordpress-demo${slot}-wordpress-1`;
     const database = `wp_demo${slot}`;
-    const goldenSqlPath = `${LAB.goldenDir}/demo-${slot}.sql`;
 
     await this.destroyWordpress(slot);
     await this.ensureNetwork(network);
@@ -361,13 +249,8 @@ class DockerodeService implements DockerService {
       NetworkingConfig: { EndpointsConfig: { [network]: { Aliases: ["db"] } } },
     });
     await db.start();
-    await this.waitForDb(dbName, LAB.dbRootPassword);
 
-    // Restore the clean golden snapshot before WordPress boots so it skips the
-    // install wizard and comes up pre-configured.
-    await this.restoreSqlIntoDb(dbName, database, LAB.dbRootPassword, goldenSqlPath);
-
-    // --- WordPress ---
+    // --- WordPress --- (its entrypoint waits for the DB; install wizard on first visit)
     const wp = await this.docker.createContainer({
       Image: LAB.wpImage,
       name: wpName,
@@ -431,32 +314,6 @@ export function dockerService(): DockerService {
     _service = new MockDockerService();
   }
   return _service;
-}
-
-/**
- * Map an internal DockerContainer (DB row) to the actual host docker
- * container names + golden snapshot path for soft-reset.
- *
- * Currently hard-coded to the Tertiary Training WordPress demo layout:
- *   - environment.name === "WordPress"
- *   - port range 8081..8085 → wordpress-demo{1..5}-{wordpress,db}-1
- */
-export function wpSoftResetTarget(args: {
-  environmentName: string;
-  port: number;
-  containerUrl: string;
-  displayName: string;
-}): WpContainerInfo | null {
-  if (args.environmentName !== "WordPress") return null;
-  const n = args.port - 8080;
-  if (n < 1 || n > 5) return null;
-  return {
-    displayName: args.displayName,
-    wpContainer: `wordpress-demo${n}-wordpress-1`,
-    dbContainer: `wordpress-demo${n}-db-1`,
-    goldenSqlPath: `${LAB.goldenDir}/demo-${n}.sql`,
-    containerUrl: args.containerUrl,
-  };
 }
 
 /**

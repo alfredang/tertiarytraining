@@ -14,6 +14,13 @@ const guides = [
     icon: "→",
   },
   {
+    href: "/how-to/container-lifecycle",
+    title: "Container Lifecycle",
+    description:
+      "How on-demand labs work: Start spawns a fresh, up-to-date container, Stop deletes it (zero memory), Refresh recreates it clean. Status badges and who can do what.",
+    icon: "♻",
+  },
+  {
     href: "/how-to/setup-coolify-cicd",
     title: "Setup Coolify CI/CD",
     description:
