@@ -6,3 +6,6 @@ out
 *.log
 .DS_Store
 .mcp.json
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo

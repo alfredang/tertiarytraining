@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
-import { dockerService, hostContainerNamesFor } from "@/lib/docker";
+import { dockerService } from "@/lib/docker";
 
 export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   // Admins and trainers can start containers (learners cannot).
@@ -26,25 +26,29 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
 
   await prisma.dockerContainer.update({
     where: { id },
-    data: { status: "REFRESHING" }, // re-use REFRESHING as "transition"
+    data: { status: "REFRESHING" }, // re-use REFRESHING as the "provisioning" transition
   });
 
   const svc = dockerService();
-  const names = hostContainerNamesFor({
-    environmentName: container.environment.name,
-    port: container.port,
-  });
 
   try {
-    for (const n of names) await svc.start(n);
+    // On-demand: spawn a fresh container (WordPress = wp+db pair restored to a
+    // clean golden snapshot), always pulling the latest image.
+    const { containerUrl } = await svc.spawnLab({
+      environmentName: container.environment.name,
+      image: container.environment.dockerImage,
+      name: container.name,
+      port: container.port,
+    });
     await prisma.dockerContainer.update({
       where: { id },
       data: {
         status: "RUNNING",
+        containerUrl,
         lastAccessedAt: new Date(),
       },
     });
-    return NextResponse.json({ ok: true, containerUrl: container.containerUrl });
+    return NextResponse.json({ ok: true, containerUrl });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await prisma.dockerContainer.update({ where: { id }, data: { status: "ERROR" } });

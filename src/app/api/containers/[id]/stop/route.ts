@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
-import { dockerService, hostContainerNamesFor } from "@/lib/docker";
+import { dockerService } from "@/lib/docker";
 
 export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { user, error, status } = await requireRole("ADMIN", "TRAINER");
@@ -23,13 +23,16 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const svc = dockerService();
-  const names = hostContainerNamesFor({
-    environmentName: container.environment.name,
-    port: container.port,
-  });
 
   try {
-    for (const n of names) await svc.stop(n);
+    // On-demand: delete the container(s) entirely so a stopped lab leaves
+    // nothing running and consumes zero memory.
+    await svc.destroyLab({
+      environmentName: container.environment.name,
+      image: container.environment.dockerImage,
+      name: container.name,
+      port: container.port,
+    });
     await prisma.dockerContainer.update({
       where: { id },
       data: { status: "STOPPED" },

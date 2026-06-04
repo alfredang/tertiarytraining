@@ -24,10 +24,13 @@ export default async function Page() {
         <h1 className="text-2xl font-semibold mb-1">Enable Real Docker Control</h1>
         <p className="text-sm text-zinc-400 mb-8">
           Switch the app from the default <code>mock</code> Docker driver to{" "}
-          <code>dockerode</code>, so the <strong>Refresh</strong> action
-          actually controls the host&apos;s Docker containers. For WordPress
-          demos this enables a fast <em>soft-reset</em> that restores each
-          site to a known good state without losing admin credentials.
+          <code>dockerode</code>, so <strong>Start</strong> / <strong>Stop</strong>{" "}
+          actually control the host&apos;s Docker containers. The app uses an{" "}
+          <strong>on-demand lifecycle</strong>: <strong>Start</strong> spawns a
+          fresh container (WordPress = a new wp + db pair restored to a clean
+          golden snapshot, latest image pulled every time); <strong>Stop</strong>{" "}
+          deletes the container entirely. A stopped lab therefore leaves nothing
+          running and consumes <strong>zero memory</strong>.
         </p>
 
         <div className="space-y-8 text-sm leading-relaxed">
@@ -42,19 +45,24 @@ export default async function Page() {
               </thead>
               <tbody className="divide-y divide-zinc-800">
                 <Row
+                  k="Start (WordPress)"
+                  a="No-op — only flips DB status"
+                  b="Pulls latest images, creates a fresh wp + db pair on a dedicated network, restores the golden snapshot, starts WordPress. ~10–30 s."
+                />
+                <Row
+                  k="Stop (WordPress)"
+                  a="No-op — only flips DB status"
+                  b="Force-removes the wp + db pair, volumes, and network. Zero memory while stopped."
+                />
+                <Row
                   k="Refresh WordPress"
                   a="No-op — only logs"
-                  b="Restores DB from golden SQL snapshot. Keeps credentials. ~1-2 s."
+                  b="Soft-reset: restores DB from golden SQL snapshot in place. Keeps credentials. ~1-2 s."
                 />
                 <Row
-                  k="Refresh non-WP"
-                  a="No-op — only logs"
-                  b="Stop + remove + recreate container from image"
-                />
-                <Row
-                  k="Refresh logs row written"
-                  a="Yes"
-                  b="Yes"
+                  k="Latest image on Start"
+                  a="n/a"
+                  b="Always pulled (falls back to local copy only if the registry pull fails)"
                 />
                 <Row
                   k="Host Docker socket required"
@@ -168,17 +176,17 @@ docker build --build-arg DOCKER_GID=<your-gid> -t app .`}
             </pre>
           </Step>
 
-          <Step number={6} title="Verify with a refresh">
+          <Step number={6} title="Verify the on-demand lifecycle">
             <p>
               Log in as admin → <Link href="/admin/containers" className="text-indigo-400 hover:underline">Admin → Containers</Link>{" "}
-              → filter by <strong>WordPress</strong> → click ↻ on{" "}
+              → filter by <strong>WordPress</strong> → click <strong>Start</strong> on{" "}
               <code>WP Demo 1</code>.
             </p>
             <ul className="list-disc pl-5 space-y-0.5 text-xs">
-              <li>Status flips to <code>REFRESHING</code> then back to <code>RUNNING</code> within ~2 seconds.</li>
-              <li>Open <code>http://168.231.119.201:8081/wp-admin</code> — the <code>tertiarytraining</code> login still works.</li>
-              <li>Any posts/pages you added before the refresh are gone — back to the golden state.</li>
-              <li>A new row appears in <Link href="/admin/refresh-logs" className="text-indigo-400 hover:underline">Refresh Logs</Link>.</li>
+              <li>Status flips to <code>REFRESHING</code> (provisioning) then to <code>RUNNING</code> once the pair is up (~10–30 s on first pull).</li>
+              <li>On the host, <code>docker ps</code> now shows <code>wordpress-demo1-wordpress-1</code> and <code>wordpress-demo1-db-1</code> — they did not exist before Start.</li>
+              <li>Open <code>http://168.231.119.201:8081/wp-admin</code> — the <code>tertiarytraining</code> login works against the clean golden state.</li>
+              <li>Click <strong>Stop</strong>: status goes to <code>STOPPED</code> and <code>docker ps -a</code> shows the pair is <em>gone</em> (not just stopped) — zero memory used.</li>
             </ul>
           </Step>
 

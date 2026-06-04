@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { dockerService, hostContainerNamesFor } from "@/lib/docker";
+import { dockerService } from "@/lib/docker";
 
 /**
- * Auto-stop containers idle for more than IDLE_HOURS.
+ * Auto-stop (destroy) containers idle for more than IDLE_HOURS.
  *
  * Designed to be invoked by a systemd timer on the host (or external
  * cron). Gated by the SEED_TOKEN to keep it from being a DoS vector.
@@ -43,12 +43,14 @@ export async function POST(req: Request) {
   const failed: { name: string; error: string }[] = [];
 
   for (const c of idle) {
-    const names = hostContainerNamesFor({
-      environmentName: c.environment.name,
-      port: c.port,
-    });
     try {
-      for (const n of names) await svc.stop(n);
+      // On-demand: destroy the idle lab's container(s) entirely to free memory.
+      await svc.destroyLab({
+        environmentName: c.environment.name,
+        image: c.environment.dockerImage,
+        name: c.name,
+        port: c.port,
+      });
       await prisma.dockerContainer.update({
         where: { id: c.id },
         data: { status: "STOPPED" },
