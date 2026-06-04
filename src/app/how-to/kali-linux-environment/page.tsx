@@ -162,11 +162,10 @@ chmod +x /usr/local/bin/tt-kali-bootstrap.sh
           <Section title="Heads-up on resource use">
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200/90">
               ⚠️ A single idle Kali desktop container uses ~1–2 GB of RAM.
-              Running all 5 simultaneously + 5 Ubuntu desktops + the WP
-              stack on the same VPS will be tight on an 8 GB box. If
-              learners aren&apos;t actively using all of them at once,
-              consider stopping idle containers (
-              <code>docker stop kali-demoN</code>) when not in use.
+              Running all 5 simultaneously alongside the WordPress stack on
+              the same VPS will be tight on an 8 GB box. With the on-demand
+              lifecycle, stopping a lab deletes its container and frees the
+              memory — so stop labs that aren&apos;t in active use.
             </div>
           </Section>
         </div>

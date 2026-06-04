@@ -28,13 +28,6 @@ const guides = [
     icon: "⌬",
   },
   {
-    href: "/how-to/ubuntu-environment",
-    title: "Ubuntu Environment",
-    description:
-      "5 Ubuntu 24.04 desktop containers (XFCE) accessed via a full browser GUI. Install software via apt as learners need it.",
-    icon: "▣",
-  },
-  {
     href: "/how-to/kali-linux-environment",
     title: "Kali Linux Environment",
     description:

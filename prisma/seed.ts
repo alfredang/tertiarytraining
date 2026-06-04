@@ -29,13 +29,6 @@ async function main() {
       accessUrl: "http://168.231.119.201:8081/",
     },
     {
-      name: "Ubuntu",
-      description: "Ubuntu 24.04 XFCE desktop in the browser (linuxserver/webtop).",
-      dockerImage: "lscr.io/linuxserver/webtop:ubuntu-xfce",
-      defaultPort: 8091,
-      accessUrl: "http://168.231.119.201:8091/",
-    },
-    {
       name: "Kali Linux",
       description: "Kali rolling desktop in the browser (linuxserver/kali-linux). Install Kali toolsets via apt.",
       dockerImage: "lscr.io/linuxserver/kali-linux:latest",

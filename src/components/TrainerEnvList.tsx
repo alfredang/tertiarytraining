@@ -17,12 +17,6 @@ const EXTERNAL_PLAYGROUNDS: Record<
   string,
   { label: string; url: string; description: string }
 > = {
-  Ubuntu: {
-    label: "Ubuntu (Killercoda)",
-    url: "https://killercoda.com/playgrounds/scenario/ubuntu",
-    description:
-      "Free browser-based Ubuntu playground hosted by Killercoda. Use as a fallback when all in-house demos are busy. No login required.",
-  },
   Kubernetes: {
     label: "Kubernetes (Killercoda)",
     url: "https://killercoda.com/playgrounds/scenario/kubernetes",

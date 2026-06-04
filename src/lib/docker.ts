@@ -135,11 +135,7 @@ class MockDockerService implements DockerService {
 // Dockerode — real Docker control via /var/run/docker.sock.
 // ============================================================================
 class DockerodeService implements DockerService {
-  private docker: Docker;
-
-  constructor(client?: Docker) {
-    this.docker = client || new Docker({ socketPath: "/var/run/docker.sock" });
-  }
+  private docker = new Docker({ socketPath: "/var/run/docker.sock" });
 
   async stopAndRemove(name: string): Promise<void> {
     try {
@@ -328,10 +324,9 @@ class DockerodeService implements DockerService {
     const slot = wpSlot(spec.environmentName, spec.port);
     if (slot !== null) return this.spawnWordpress(slot, spec.port);
 
-    // Generic single-container lab (e.g. linuxserver webtop/kali on internal :3000).
+    // Generic single-container lab (e.g. linuxserver kali on internal :3000).
     await this.destroyLab(spec); // clear any leftover with the same name
-    const internalPort =
-      spec.environmentName === "Ubuntu" || spec.environmentName === "Kali Linux" ? 3000 : undefined;
+    const internalPort = spec.environmentName === "Kali Linux" ? 3000 : undefined;
     return this.run(spec.image, spec.name, spec.port, { internalPort });
   }
 
@@ -420,67 +415,16 @@ class DockerodeService implements DockerService {
 }
 
 // ============================================================================
-// Dual Router — sends Ubuntu to remote, everything else to local
-// ============================================================================
-class DualDockerService implements DockerService {
-  private local = new DockerodeService();
-  private remote: DockerodeService | null = null;
-
-  constructor() {
-    const host = process.env.REMOTE_DOCKER_HOST;
-    if (host) {
-      const port = Number(process.env.REMOTE_DOCKER_PORT || 2375);
-      // Construct URL appropriately for Dockerode
-      const isUrl = host.startsWith("http") || host.startsWith("tcp");
-      const remoteClient = new Docker(isUrl ? { host, port } : { host: `http://${host}`, port });
-      this.remote = new DockerodeService(remoteClient);
-      console.log(`[docker] initialized Remote Docker engine at ${host}:${port} for Ubuntu containers`);
-    }
-  }
-
-  private isRemote(name: string): boolean {
-    return name.toLowerCase().includes("ubuntu");
-  }
-
-  private getService(name: string): DockerService {
-    if (this.isRemote(name)) {
-      if (!this.remote) {
-        console.warn(`[docker] WARNING: Ubuntu container requested but REMOTE_DOCKER_HOST is not set. Falling back to local Docker engine.`);
-        return this.local;
-      }
-      return this.remote;
-    }
-    return this.local;
-  }
-
-  async stopAndRemove(name: string): Promise<void> { return this.getService(name).stopAndRemove(name); }
-  async start(name: string): Promise<void> { return this.getService(name).start(name); }
-  async stop(name: string): Promise<void> { return this.getService(name).stop(name); }
-
-  async run(image: string, name: string, port: number, opts?: RunOptions): Promise<RunResult> {
-    return this.getService(name).run(image, name, port, opts);
-  }
-
-  // On-demand lifecycle: route by environment (Ubuntu → remote engine, else local).
-  async spawnLab(spec: LabSpec): Promise<RunResult> {
-    return this.getService(spec.environmentName).spawnLab(spec);
-  }
-  async destroyLab(spec: LabSpec): Promise<void> {
-    return this.getService(spec.environmentName).destroyLab(spec);
-  }
-}
-
-// ============================================================================
 let _service: DockerService | null = null;
 export function dockerService(): DockerService {
   if (_service) return _service;
   const mode = (process.env.DOCKER_HOST_MODE ?? "mock").toLowerCase();
   if (mode === "dockerode") {
     try {
-      _service = new DualDockerService();
-      console.log("[docker] using DualDockerService (Dockerode)");
+      _service = new DockerodeService();
+      console.log("[docker] using DockerodeService");
     } catch (err) {
-      console.error("[docker] failed to init DualDockerService, falling back to mock", err);
+      console.error("[docker] failed to init DockerodeService, falling back to mock", err);
       _service = new MockDockerService();
     }
   } else {
@@ -520,7 +464,7 @@ export function wpSoftResetTarget(args: {
  * started/stopped together for a given DockerContainer row.
  *
  * - WordPress: wp + db pair
- * - Ubuntu / Kali Linux: single container matching the display name pattern
+ * - Kali Linux: single container matching the display name pattern
  */
 export function hostContainerNamesFor(args: {
   environmentName: string;
@@ -530,11 +474,6 @@ export function hostContainerNamesFor(args: {
     const n = args.port - 8080;
     if (n < 1 || n > 5) return [];
     return [`wordpress-demo${n}-wordpress-1`, `wordpress-demo${n}-db-1`];
-  }
-  if (args.environmentName === "Ubuntu") {
-    const n = args.port - 8090;
-    if (n < 1 || n > 5) return [];
-    return [`ubuntu-demo${n}`];
   }
   if (args.environmentName === "Kali Linux") {
     const n = args.port - 8095;
