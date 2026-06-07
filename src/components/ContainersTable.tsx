@@ -171,10 +171,18 @@ export function ContainersTable() {
                     {c.containerUrl}
                   </a>
                 </td>
-                <td className="px-4 py-2"><StatusBadge status={c.status} /></td>
+                <td className="px-4 py-2"><StatusBadge status={busy === c.id ? "REFRESHING" : c.status} /></td>
                 <td className="px-4 py-2 text-zinc-400">{c.lastRefreshedAt ? new Date(c.lastRefreshedAt).toLocaleString() : "—"}</td>
                 <td className="px-4 py-2 text-right whitespace-nowrap">
-                  <button className="btn btn-ghost py-1 px-2 text-xs" disabled={busy === c.id} onClick={() => refresh(c.id)}>↻</button>
+                  <button
+                    className="btn btn-ghost py-1 px-2 text-xs"
+                    disabled={busy === c.id}
+                    onClick={() => refresh(c.id)}
+                    title="Rebuild (recreate the container fresh)"
+                  >
+                    <span className={busy === c.id ? "inline-block animate-spin" : "inline-block"}>↻</span>
+                    {busy === c.id ? " Building…" : ""}
+                  </button>
                   <button className="btn btn-ghost py-1 px-2 text-xs ml-1" onClick={() => openEdit(c)}>Edit</button>
                   <button className="btn btn-danger py-1 px-2 text-xs ml-1" onClick={() => setConfirmDel(c)}>Delete</button>
                 </td>
