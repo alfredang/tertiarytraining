@@ -94,6 +94,22 @@ export function ContainersTable() {
     else { toast.push("success", "Container refreshed"); load(); }
   }
 
+  async function start(id: string) {
+    setBusy(id);
+    const res = await fetch(`/api/containers/${id}/start`, { method: "POST" });
+    setBusy(null);
+    if (!res.ok) toast.push("error", "Start failed");
+    else { toast.push("success", "Container started"); load(); }
+  }
+
+  async function stop(id: string) {
+    setBusy(id);
+    const res = await fetch(`/api/containers/${id}/stop`, { method: "POST" });
+    setBusy(null);
+    if (!res.ok) toast.push("error", "Stop failed");
+    else { toast.push("success", "Container stopped"); load(); }
+  }
+
   async function refreshByEnv() {
     if (filterEnv === "ALL") { toast.push("info", "Pick an environment first"); return; }
     setBusy(filterEnv);
@@ -174,14 +190,36 @@ export function ContainersTable() {
                 <td className="px-4 py-2"><StatusBadge status={busy === c.id ? "REFRESHING" : c.status} /></td>
                 <td className="px-4 py-2 text-zinc-400">{c.lastRefreshedAt ? new Date(c.lastRefreshedAt).toLocaleString() : "—"}</td>
                 <td className="px-4 py-2 text-right whitespace-nowrap">
+                  {c.status === "RUNNING" ? (
+                    <button
+                      className="btn btn-ghost py-1 px-2 text-xs"
+                      disabled={busy === c.id}
+                      onClick={() => stop(c.id)}
+                      title="Stop and delete the container"
+                    >
+                      ■ Stop
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-ghost py-1 px-2 text-xs"
+                      disabled={busy === c.id}
+                      onClick={() => start(c.id)}
+                      title="Start (spawn) the container"
+                    >
+                      {busy === c.id ? (
+                        <><span className="inline-block animate-spin">↻</span> Building…</>
+                      ) : (
+                        "▶ Start"
+                      )}
+                    </button>
+                  )}
                   <button
-                    className="btn btn-ghost py-1 px-2 text-xs"
+                    className="btn btn-ghost py-1 px-2 text-xs ml-1"
                     disabled={busy === c.id}
                     onClick={() => refresh(c.id)}
                     title="Rebuild (recreate the container fresh)"
                   >
                     <span className={busy === c.id ? "inline-block animate-spin" : "inline-block"}>↻</span>
-                    {busy === c.id ? " Building…" : ""}
                   </button>
                   <button className="btn btn-ghost py-1 px-2 text-xs ml-1" onClick={() => openEdit(c)}>Edit</button>
                   <button className="btn btn-danger py-1 px-2 text-xs ml-1" onClick={() => setConfirmDel(c)}>Delete</button>
