@@ -18,7 +18,7 @@ export const trainerNav: NavItem[] = [
   { href: "/dashboard/trainer", label: "My Environments", icon: "▣" },
   { href: "/admin/signup-approvals", label: "Signup Approvals", icon: "✓" },
   { href: "/admin/users", label: "Learners", icon: "👥" },
-  { href: "/playgrounds", label: "Playground", icon: "🧪" },
+  { href: "/playgrounds", label: "Playgrounds", icon: "🧪" },
   { href: "/how-to/workflow", label: "Workflow", icon: "→" },
   { href: "/how-to/container-lifecycle", label: "Container Lifecycle", icon: "♻" },
   { href: "/how-to", label: "How To", icon: "?" },
@@ -26,7 +26,7 @@ export const trainerNav: NavItem[] = [
 
 export const learnerNav: NavItem[] = [
   { href: "/dashboard/learner", label: "My Environments", icon: "▣" },
-  { href: "/playgrounds", label: "Playground", icon: "🧪" },
+  { href: "/playgrounds", label: "Playgrounds", icon: "🧪" },
   { href: "/how-to", label: "How To", icon: "?" },
 ];
 
