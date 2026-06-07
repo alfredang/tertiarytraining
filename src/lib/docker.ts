@@ -25,12 +25,24 @@ export type RunResult = { containerUrl: string };
  * non-production placeholders; set the env vars in Coolify to override.
  */
 const LAB = {
-  wpImage: process.env.WP_IMAGE ?? "wordpress:latest",
+  // Auto-configuring image (built from docker/wordpress-auto) — self-installs
+  // WordPress on boot so the lab comes up ready to use, no install wizard.
+  wpImage: process.env.WP_IMAGE ?? "tt-wordpress-auto:latest",
   dbImage: process.env.WP_DB_IMAGE ?? "mariadb:11",
   dbUser: process.env.WP_DB_USER ?? "wpuser",
   dbPassword: process.env.WP_DB_PASSWORD ?? "wp_lab_pw",
   dbRootPassword: process.env.WP_DB_ROOT_PASSWORD ?? "wp_lab_root_pw",
+  // Default admin login baked into every freshly-spawned WordPress lab.
+  adminUser: process.env.WP_ADMIN_USER ?? "admin",
+  adminPassword: process.env.WP_ADMIN_PASSWORD ?? "Tertiary12345",
+  adminEmail: process.env.WP_ADMIN_EMAIL ?? "admin@tertiary.local",
 };
+
+/** Default WordPress admin credentials shown to trainers/learners. */
+export const WP_ADMIN = {
+  user: LAB.adminUser,
+  password: LAB.adminPassword,
+} as const;
 
 /** Describes the lab a DockerContainer row maps to, for spawn/destroy. */
 export type LabSpec = {
@@ -250,7 +262,8 @@ class DockerodeService implements DockerService {
     });
     await db.start();
 
-    // --- WordPress --- (its entrypoint waits for the DB; install wizard on first visit)
+    // --- WordPress --- (auto-config image self-installs once the DB is up)
+    const siteUrl = this.hostUrl(hostPort).replace(/\/$/, "");
     const wp = await this.docker.createContainer({
       Image: LAB.wpImage,
       name: wpName,
@@ -259,6 +272,12 @@ class DockerodeService implements DockerService {
         `WORDPRESS_DB_USER=${LAB.dbUser}`,
         `WORDPRESS_DB_PASSWORD=${LAB.dbPassword}`,
         `WORDPRESS_DB_NAME=${database}`,
+        // Consumed by the auto-install entrypoint (docker/wordpress-auto)
+        `WP_SITE_URL=${siteUrl}`,
+        `WP_SITE_TITLE=WP Demo ${slot}`,
+        `WP_ADMIN_USER=${LAB.adminUser}`,
+        `WP_ADMIN_PASSWORD=${LAB.adminPassword}`,
+        `WP_ADMIN_EMAIL=${LAB.adminEmail}`,
       ],
       ExposedPorts: { "80/tcp": {} },
       HostConfig: {

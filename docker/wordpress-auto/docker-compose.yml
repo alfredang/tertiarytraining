@@ -1,0 +1,35 @@
+# Reference stack for ONE fully-configured WordPress training lab.
+#
+# In production the app spawns these on-demand via the Docker API (using the
+# tt-wordpress-auto image built from the Dockerfile here). This compose file is
+# for building/testing the image standalone:
+#
+#   docker compose -f docker/wordpress-auto/docker-compose.yml up --build
+#   # then open http://localhost:8081  (admin / Tertiary12345)
+services:
+  db:
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: ${WP_DB_ROOT_PASSWORD:-wp_lab_root_pw}
+      MARIADB_DATABASE: ${WP_DB_NAME:-wp_demo}
+      MARIADB_USER: ${WP_DB_USER:-wpuser}
+      MARIADB_PASSWORD: ${WP_DB_PASSWORD:-wp_lab_pw}
+
+  wordpress:
+    build: .
+    image: tt-wordpress-auto:latest
+    depends_on:
+      - db
+    ports:
+      - "${WP_PORT:-8081}:80"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: ${WP_DB_USER:-wpuser}
+      WORDPRESS_DB_PASSWORD: ${WP_DB_PASSWORD:-wp_lab_pw}
+      WORDPRESS_DB_NAME: ${WP_DB_NAME:-wp_demo}
+      # Auto-install settings (consumed by auto-install.sh)
+      WP_SITE_URL: ${WP_SITE_URL:-http://localhost:8081}
+      WP_SITE_TITLE: ${WP_SITE_TITLE:-WordPress Training Lab}
+      WP_ADMIN_USER: ${WP_ADMIN_USER:-admin}
+      WP_ADMIN_PASSWORD: ${WP_ADMIN_PASSWORD:-Tertiary12345}
+      WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL:-admin@tertiary.local}

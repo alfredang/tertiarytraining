@@ -104,7 +104,9 @@ export default async function Page() {
               <li>
                 <strong>WordPress</strong> — a pair of containers (WordPress +
                 MariaDB) on a private network, published on its assigned port
-                (8081–8085). First visit shows the WordPress install wizard.
+                (8081–8085). It comes up <strong>fully configured</strong> (no
+                install wizard) and ready to log in at <code>/wp-admin</code>{" "}
+                with <code>admin</code> / <code>Tertiary12345</code>.
               </li>
               <li>
                 <strong>Kali Linux</strong> — a single browser-desktop

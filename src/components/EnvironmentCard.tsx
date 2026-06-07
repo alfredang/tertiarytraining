@@ -76,8 +76,8 @@ export function EnvironmentCard({
       return;
     }
     if (canControl) {
-      // Offer to start in-place. Selkies takes ~20-30 s after start to be ready.
-      if (confirm(`${env.name} is not running. Start it now?\n\nIt may take ~20-30 seconds before the desktop is ready.`)) {
+      // Offer to start in-place. A fresh container takes ~20-30 s to be ready.
+      if (confirm(`${env.name} is not running. Start it now?\n\nIt may take ~20-30 seconds before the lab is ready.`)) {
         const ok = await startContainer();
         if (ok && env.containerUrl) {
           // Give the container a few seconds to come up, then open
@@ -98,6 +98,27 @@ export function EnvironmentCard({
         <StatusBadge status={status} />
       </div>
       <p className="text-sm text-zinc-400 line-clamp-3">{env.description}</p>
+      {env.name === "WordPress" && isRunning && env.containerUrl && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-2.5 text-xs">
+          <div className="text-zinc-500 mb-1">WordPress admin login</div>
+          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-zinc-300">
+            <span>
+              User: <code className="text-zinc-100">admin</code>
+            </span>
+            <span>
+              Password: <code className="text-zinc-100">Tertiary12345</code>
+            </span>
+          </div>
+          <a
+            href={`${env.containerUrl.replace(/\/$/, "")}/wp-admin/`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-block text-indigo-400 hover:underline"
+          >
+            Open wp-admin ↗
+          </a>
+        </div>
+      )}
       <div className="mt-auto flex flex-wrap items-center gap-2">
         <button
           className="btn btn-primary"
